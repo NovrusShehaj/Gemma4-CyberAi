@@ -2,7 +2,7 @@
 
 > A cybersecurity-specialized language model built on Google's open-weight `gemma3:4b`, served locally via Ollama, and specialized for **defensive security, CTF/HTB/THM-style reasoning, and authorized red-team education**.
 >
-> **Status:** Planning (Phase 0). No implementation started.
+> **Status:** Milestone 1 complete (2026-08-23) — Ollama client + frozen `benchmark_v1` (25 items) + baseline harness. Baseline recorded for `gemma3:4b`: pass_rate 0.84 / mean_score 0.813; standout weakness = hallucination resistance (0.0). No fine-tuning yet. See `docs/decisions.md` and `experiments/baseline_gemma3-4b/`.
 > **Author context:** Solo developer, single laptop-class dev machine (see §20).
 > **Document purpose:** Technical roadmap that another engineer (or a future session) can execute without re-deriving decisions.
 > **Last updated:** 2026-08-23

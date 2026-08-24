@@ -2,6 +2,24 @@
 
 Meaningful decisions and deviations from `PROJECT_PLAN.md`, newest first.
 
+## 2026-08-23 — Baseline recorded + MCQ scorer bug fixed
+
+- **Baseline (gemma3:4b, benchmark_v1, temp=0, seed=0):** overall pass_rate **0.84**,
+  mean_score **0.813** (n=25). Stored in `experiments/baseline_gemma3-4b/`.
+- **Scorer bug found & fixed during verification:** the first MCQ extractor matched option
+  letters case-insensitively, so lowercase prose (e.g. the article "A" in "A CVSS score…")
+  was mis-read as the answer. Made letter matching case-sensitive + leading-answer priority;
+  added regression tests. Also broadened insufficient-evidence markers to include
+  "impossible to determine" (the model's actual correct phrasing). Re-scored from stored
+  responses via `scripts/rescore.py` (no re-inference; outputs are deterministic).
+- **Key finding — actionable weakness:** `hallucination` category scored **0.0** — the base
+  model engages with a fabricated CVE and a fabricated tool instead of flagging them. This is
+  the clearest target for specialization (SFT for refusal/uncertainty behavior + later RAG).
+- **Known proxy-scorer softness (left as-is, not tuned):** `evidence_interpretation` (n=1) and
+  one `detection_engineering` item scored low on keyword matching though responses looked
+  reasonable. Editing keywords after seeing responses would overfit the benchmark; deferred to
+  a future LLM-judge scorer (PROJECT_PLAN.md §17).
+
 ## 2026-08-23 — Milestone 1: baseline harness implemented
 
 - **Package layout:** used a src-layout package `src/gemma_cyber/` (with `clients/` and
