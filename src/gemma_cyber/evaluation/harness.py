@@ -79,12 +79,18 @@ def run_benchmark(
     num_predict: int = 512,
     experiment_name: str | None = None,
     split: str | None = None,
+    judge: "JudgeScorer | None" = None,
 ) -> dict:
     """Run every benchmark item through `client`, score, and persist results.
 
     If `split` is given ("dev" or "test"), only items with that split are run.
     This lets the held-out `test` set be evaluated separately from `dev`
     (see data/evaluation/README.md).
+
+    If `judge` (a `JudgeScorer`) is given, each item is ALSO graded by the LLM judge and
+    the judge verdict is attached to that item's record (`judge_passed`, `judge_score`,
+    `judge_detail`, `judge_error`). The deterministic score remains the primary,
+    reproducible number; the judge is a supplement and never overwrites it.
     """
     items = load_benchmark(benchmark_path)
     if split is not None:
@@ -96,6 +102,7 @@ def run_benchmark(
 
     per_item = []
     results: list[ScoreResult] = []
+    judge_pass = judge_total = judge_errors = 0
     started = time.time()
     for item in items:
         prompt = item.render_prompt()
@@ -105,7 +112,7 @@ def run_benchmark(
         )
         result = score_item(item, gen.text)
         results.append(result)
-        per_item.append({
+        record = {
             "id": item.id,
             "category": item.category,
             "domain": item.domain,
@@ -115,7 +122,19 @@ def run_benchmark(
             "passed": result.passed,
             "detail": result.detail,
             "response": gen.text,
-        })
+        }
+        if judge is not None:
+            verdict = judge.evaluate(item, gen.text)
+            record.update({
+                "judge_passed": verdict.passed,
+                "judge_score": verdict.score,
+                "judge_detail": verdict.reason,
+                "judge_error": verdict.error,
+            })
+            judge_total += 1
+            judge_pass += int(verdict.passed)
+            judge_errors += int(verdict.error is not None)
+        per_item.append(record)
     duration = round(time.time() - started, 1)
 
     aggregates = _aggregate(results, items)
@@ -137,6 +156,16 @@ def run_benchmark(
         **aggregates,
         "items": per_item,
     }
+    if judge is not None:
+        report["judge"] = {
+            "model": judge.model,
+            "prompt_version": judge.prompt_version,
+            "temperature": judge.temperature,
+            "seed": judge.seed,
+            "count": judge_total,
+            "pass_rate": round(judge_pass / judge_total, 3) if judge_total else None,
+            "errors": judge_errors,
+        }
 
     (out_dir / "results.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"

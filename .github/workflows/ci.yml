@@ -1,0 +1,27 @@
+name: CI
+
+# Automated regression detection: run the test suite on every push and PR.
+# The suite is environment-safe — it needs no Ollama, no models, and no external
+# LLM/API. The one live inference test auto-skips when Ollama is unreachable, and the
+# LLM-judge tests mock the provider at the client boundary.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Match the project's supported interpreter (pyproject: >=3.11,<3.13).
+          python-version: "3.12"
+
+      - name: Install project (with dev deps)
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run tests
+        run: pytest
