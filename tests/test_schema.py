@@ -75,7 +75,7 @@ def test_split_accepts_dev_and_test():
 def test_split_rejects_invalid_value():
     with pytest.raises(ValidationError):
         BenchmarkItem(id="x", category="c", domain="general", scorer="mcq", question="q",
-                      choices={"A": "a", "B": "b"}, answer="A", split="train")
+                      choices={"A": "a", "B": "b"}, answer="A", split="train")  # type: ignore[arg-type]
 
 
 def test_v1_still_loads_and_is_frozen_without_split():

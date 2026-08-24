@@ -2,8 +2,8 @@
 
 import json
 
-from gemma_cyber.evaluation.harness import run_benchmark
 from gemma_cyber.clients.ollama_client import GenerationResult
+from gemma_cyber.evaluation.harness import run_benchmark
 
 
 class StubClient:

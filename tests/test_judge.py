@@ -4,8 +4,6 @@ The provider is mocked at the client boundary (a fake `.generate`), so these tes
 deterministic, fast, and require NO live LLM / Ollama / credentials.
 """
 
-import pytest
-
 from gemma_cyber.clients.ollama_client import GenerationResult
 from gemma_cyber.evaluation.judge import (
     JudgeScorer,

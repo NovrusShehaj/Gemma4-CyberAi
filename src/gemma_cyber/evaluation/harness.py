@@ -13,13 +13,15 @@ from __future__ import annotations
 import json
 import platform
 import time
-from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from gemma_cyber.evaluation.schema import BenchmarkItem, load_benchmark
 from gemma_cyber.evaluation.scorers import ScoreResult, score_item
+
+if TYPE_CHECKING:
+    from gemma_cyber.evaluation.judge import JudgeScorer
 
 # Neutral system prompt used for the BASELINE. Kept minimal on purpose: the
 # baseline should reflect the base model's own ability, lightly framed.
@@ -79,7 +81,7 @@ def run_benchmark(
     num_predict: int = 512,
     experiment_name: str | None = None,
     split: str | None = None,
-    judge: "JudgeScorer | None" = None,
+    judge: JudgeScorer | None = None,
 ) -> dict:
     """Run every benchmark item through `client`, score, and persist results.
 
@@ -140,7 +142,7 @@ def run_benchmark(
     aggregates = _aggregate(results, items)
     report = {
         "experiment": experiment_name or out_dir.name,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "model": getattr(client, "model", "unknown"),
         "benchmark_path": str(benchmark_path),
         "benchmark_size": len(items),
