@@ -1,0 +1,58 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# ---- Environments & secrets (NEVER commit) ----
+.env
+.env.*
+*.pem
+*.key
+*_rsa
+*_ed25519
+id_rsa*
+id_ed25519*
+*.pfx
+*.p12
+credentials.json
+secrets.yaml
+secrets.yml
+*.token
+.netrc
+
+# ---- Models & large artifacts (kept out of git) ----
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+checkpoints/
+
+# ---- Data: raw/processed are local; evaluation benchmark IS tracked ----
+data/raw/
+data/processed/
+data/quarantine/
+# NOTE: data/evaluation/ (frozen benchmark) and data/training/ ARE tracked intentionally.
+
+# ---- Tooling caches ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# ---- Experiment outputs: keep manifests/scorecards, ignore bulky raw dumps ----
+experiments/**/raw_outputs/
