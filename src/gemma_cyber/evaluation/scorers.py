@@ -20,6 +20,12 @@ UNCERTAINTY_MARKERS = [
     "cannot determine",
     "can't determine",
     "cannot be determined",
+    "impossible to determine",
+    "impossible to know",
+    "impossible to identify",
+    "impossible to say",
+    "no way to determine",
+    "no way to know",
     "need more",
     "more information",
     "more context",
@@ -52,23 +58,38 @@ class ScoreResult:
 
 
 def _extract_mcq_letter(text: str, valid_keys: list[str]) -> str | None:
-    """Find the model's chosen option letter in a free-form response."""
-    keys = "".join(re.escape(k) for k in valid_keys)
-    # Prefer explicit patterns: "Answer: B", "answer is B", "(B)", "B)"
-    patterns = [
-        rf"answer\s*(?:is|:)?\s*\(?([{keys}])\b",
-        rf"\b([{keys}])\)",
-        rf"\(([{keys}])\)",
-        rf"^\s*([{keys}])\b",
-    ]
-    lowered = text.strip()
-    for pat in patterns:
-        m = re.search(pat, lowered, flags=re.IGNORECASE | re.MULTILINE)
-        if m:
-            return m.group(1).upper()
-    # Fallback: first standalone valid letter anywhere.
-    m = re.search(rf"\b([{keys}])\b", text, flags=re.IGNORECASE)
-    return m.group(1).upper() if m else None
+    """Find the model's chosen option letter in a free-form response.
+
+    Option letters are matched CASE-SENSITIVELY (uppercase). Using IGNORECASE
+    here is a trap: single lowercase letters occur constantly in prose (the
+    article "a", "(e.g. ...)"), which caused false extractions. Models emit the
+    chosen option as an uppercase letter, usually at the very start (often bold,
+    e.g. "**B**"), so we prioritize that.
+    """
+    keys = "".join(re.escape(k.upper()) for k in valid_keys)
+    stripped = text.strip()
+
+    # 1. Leading letter at the very start, optionally wrapped in markdown bold.
+    m = re.match(rf"[*_`\s]*([{keys}])(?![A-Za-z])", stripped)
+    if m:
+        return m.group(1)
+
+    # 2. Explicit "answer/option/choice ... X" (letter still case-sensitive).
+    m = re.search(
+        rf"(?:answer|option|choice|correct)\b[^A-Za-z]{{0,12}}([{keys}])(?![A-Za-z])",
+        stripped, flags=re.IGNORECASE,
+    )
+    if m:
+        return m.group(1)
+
+    # 3. Common option syntaxes: "B)" or "(B)".
+    m = re.search(rf"\(?([{keys}])\)", stripped)
+    if m:
+        return m.group(1)
+
+    # 4. Fallback: first standalone UPPERCASE option letter anywhere.
+    m = re.search(rf"(?<![A-Za-z])([{keys}])(?![A-Za-z])", stripped)
+    return m.group(1) if m else None
 
 
 def _has_marker(text: str, markers: list[str]) -> bool:

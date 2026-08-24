@@ -134,6 +134,39 @@ def run_benchmark(
     return report
 
 
+def rescore_results(results_path: str | Path, benchmark_path: str | Path) -> dict:
+    """Recompute scores from an existing results.json WITHOUT re-running the model.
+
+    Model outputs are deterministic and already stored, so when scorers improve
+    we can re-score cheaply instead of paying for inference again. Writes updated
+    results.json + scorecard.md next to the input file.
+    """
+    results_path = Path(results_path)
+    prior = json.loads(results_path.read_text(encoding="utf-8"))
+    items = {it.id: it for it in load_benchmark(benchmark_path)}
+
+    results: list[ScoreResult] = []
+    item_list: list[BenchmarkItem] = []
+    new_items = []
+    for rec in prior["items"]:
+        item = items[rec["id"]]
+        item_list.append(item)
+        r = score_item(item, rec["response"])
+        results.append(r)
+        rec = {**rec, "score": r.score, "passed": r.passed, "detail": r.detail}
+        new_items.append(rec)
+
+    report = {**prior, **_aggregate(results, item_list), "items": new_items,
+              "rescored": True}
+    results_path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (results_path.parent / "scorecard.md").write_text(
+        _render_scorecard(report), encoding="utf-8"
+    )
+    return report
+
+
 def _render_scorecard(report: dict) -> str:
     o = report["overall"]
     lines = [
