@@ -78,9 +78,19 @@ def run_benchmark(
     seed: int = 0,
     num_predict: int = 512,
     experiment_name: str | None = None,
+    split: str | None = None,
 ) -> dict:
-    """Run every benchmark item through `client`, score, and persist results."""
+    """Run every benchmark item through `client`, score, and persist results.
+
+    If `split` is given ("dev" or "test"), only items with that split are run.
+    This lets the held-out `test` set be evaluated separately from `dev`
+    (see data/evaluation/README.md).
+    """
     items = load_benchmark(benchmark_path)
+    if split is not None:
+        items = [it for it in items if it.split == split]
+        if not items:
+            raise ValueError(f"no items with split={split!r} in {benchmark_path}")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,6 +125,7 @@ def run_benchmark(
         "model": getattr(client, "model", "unknown"),
         "benchmark_path": str(benchmark_path),
         "benchmark_size": len(items),
+        "split": split,
         "settings": {
             "temperature": temperature,
             "seed": seed,

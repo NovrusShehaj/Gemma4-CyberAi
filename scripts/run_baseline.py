@@ -36,6 +36,10 @@ def main() -> int:
     parser.add_argument("--host", default="http://localhost:11434")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--num-predict", type=int, default=512)
+    parser.add_argument(
+        "--split", default=None, choices=["dev", "test"],
+        help="Evaluate only this split (default: all items). The 'test' split is held out.",
+    )
     args = parser.parse_args()
 
     out = args.out or f"experiments/baseline_{args.model.replace(':', '-').replace('/', '-')}"
@@ -50,9 +54,11 @@ def main() -> int:
               file=sys.stderr)
         return 3
 
-    print(f"Running benchmark '{args.benchmark}' against '{args.model}' ...")
+    split_note = f" [split={args.split}]" if args.split else ""
+    print(f"Running benchmark '{args.benchmark}'{split_note} against '{args.model}' ...")
     report = run_benchmark(
         client, args.benchmark, out, seed=args.seed, num_predict=args.num_predict,
+        split=args.split,
     )
     o = report["overall"]
     print(f"\nDone in {report['duration_seconds']}s -> {out}/")
