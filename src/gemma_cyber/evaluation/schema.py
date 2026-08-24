@@ -18,6 +18,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 Scorer = Literal["mcq", "keyword", "insufficient_evidence", "hallucination"]
+Split = Literal["dev", "test"]
 
 
 class BenchmarkItem(BaseModel):
@@ -33,6 +34,11 @@ class BenchmarkItem(BaseModel):
     category: str  # e.g. "fundamentals", "log_analysis", "web_security"
     domain: str  # "blue_team" | "offensive_ctf" | "general"
     difficulty: Literal["intro", "intermediate", "advanced"] = "intermediate"
+
+    # dev/test split (Benchmark v2+). `test` is HELD OUT: it must never be used
+    # to iterate on prompts, data, or config. See data/evaluation/README.md.
+    # Defaults to "dev" so that pre-split artifacts (e.g. benchmark_v1) still load.
+    split: Split = "dev"
 
     # prompt fields
     question: str
