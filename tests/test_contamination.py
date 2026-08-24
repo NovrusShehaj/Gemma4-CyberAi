@@ -12,7 +12,6 @@ from gemma_cyber.data.contamination import (
     word_ngrams,
 )
 
-
 # -- normalization -----------------------------------------------------------
 
 def test_normalize_folds_case_whitespace_and_punctuation():

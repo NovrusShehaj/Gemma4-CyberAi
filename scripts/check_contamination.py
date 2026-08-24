@@ -104,13 +104,13 @@ def main() -> int:
 
     if report.exact:
         print(f"\nExact matches ({len(report.exact)}):")
-        for m in report.exact:
-            print(f"  A[{m.a_id}] == B[{m.b_id}]")
+        for em in report.exact:
+            print(f"  A[{em.a_id}] == B[{em.b_id}]")
 
     if report.fuzzy:
         print(f"\nFuzzy matches >= {args.threshold} ({len(report.fuzzy)}):")
-        for m in report.fuzzy[: args.max_fuzzy_print]:
-            print(f"  A[{m.a_id}] ~ B[{m.b_id}]  similarity={m.similarity}")
+        for fm in report.fuzzy[: args.max_fuzzy_print]:
+            print(f"  A[{fm.a_id}] ~ B[{fm.b_id}]  similarity={fm.similarity}")
         if len(report.fuzzy) > args.max_fuzzy_print:
             print(f"  ... and {len(report.fuzzy) - args.max_fuzzy_print} more")
 

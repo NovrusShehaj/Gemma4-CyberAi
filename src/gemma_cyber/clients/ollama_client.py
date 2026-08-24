@@ -80,11 +80,18 @@ class OllamaClient:
         temperature: float = 0.0,
         seed: int = 0,
         num_predict: int | None = None,
+        think: bool | None = None,
     ) -> GenerationResult:
         """Generate a single, non-streamed completion.
 
         Deterministic defaults (temperature=0, seed=0) make repeated runs
         comparable. `num_predict` caps output tokens (None = model default).
+
+        `think` controls Ollama's reasoning mode for thinking models (e.g. the
+        Gemma 4 family). Left as None the field is not sent (preserving behavior
+        for non-thinking models like gemma3:4b). Set `think=False` to force a
+        direct answer: thinking models otherwise spend the token budget on hidden
+        reasoning and return an EMPTY `response`. The LLM judge relies on this.
         """
         options: dict[str, Any] = {"temperature": temperature, "seed": seed}
         if num_predict is not None:
@@ -98,6 +105,9 @@ class OllamaClient:
         }
         if system is not None:
             payload["system"] = system
+        if think is not None:
+            payload["think"] = think
+            options["think"] = think  # record for provenance
 
         try:
             resp = requests.post(

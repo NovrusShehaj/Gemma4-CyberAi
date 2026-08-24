@@ -12,8 +12,10 @@ This project is for **education, CTFs, defensive security, systems you own, and 
 ## What this repo does right now
 
 1. Talks to `gemma3:4b` locally through Ollama (deterministic, reproducible).
-2. Runs a small, **frozen, original** cybersecurity benchmark (`data/evaluation/benchmark_v1.jsonl`) — including hallucination and "insufficient-evidence" traps.
-3. Produces a **baseline scorecard** so we can later prove whether specialization actually helped.
+2. Runs a **frozen, original** cybersecurity benchmark — `benchmark_v2.jsonl` (112 items, dev/test split) plus the historical `benchmark_v1.jsonl` (25 items) — including hallucination and "insufficient-evidence" traps.
+3. Produces a **baseline scorecard** so we can later prove whether specialization actually helped, against a **pre-registered bar** (`configs/eval_success_criteria.md`).
+4. Ships an **LLM-judge scorer** (`docs/judge.md`) that supplements the deterministic scorers to catch keyword false-negatives, plus a **contamination checker** for train↔eval overlap.
+5. Runs `pytest` in **GitHub Actions CI** on every push (no models/GPU/LLM required — the suite is environment-safe).
 
 It does **not** (yet) fine-tune, do RAG, or run agents/tools — those are later phases in `PROJECT_PLAN.md`.
 

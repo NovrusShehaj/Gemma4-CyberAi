@@ -2,7 +2,7 @@
 
 > A cybersecurity-specialized language model built on Google's open-weight `gemma3:4b`, served locally via Ollama, and specialized for **defensive security, CTF/HTB/THM-style reasoning, and authorized red-team education**.
 >
-> **Status:** Milestone 1 complete (2026-08-23) — Ollama client + frozen `benchmark_v1` (25 items) + baseline harness. **Benchmark v2 milestone complete (2026-08-24)** — evaluation instrument only, no training: frozen `benchmark_v2` (112 original items, dev/test split), contamination checker, and pre-registered success criteria. Fresh `gemma3:4b` v2 baseline: test pass_rate 0.933 / dev 0.836; **hallucination resistance = 0.000** (both splits) remains the standout weakness. No fine-tuning yet. See `docs/decisions.md`, `configs/eval_success_criteria.md`, and `experiments/baseline_gemma3-4b_v2/`.
+> **Status:** Milestone 1 complete (2026-08-23) — Ollama client + frozen `benchmark_v1` (25 items) + baseline harness. **Benchmark v2 milestone complete (2026-08-24)** — evaluation instrument only, no training: frozen `benchmark_v2` (112 original items, dev/test split), contamination checker, and pre-registered success criteria. Fresh `gemma3:4b` v2 baseline: test pass_rate 0.933 / dev 0.836; **hallucination resistance = 0.000** (both splits) remains the standout weakness. **Evaluation-hardening (P1) in progress (2026-08-24):** open questions Q1–Q3 answered (`docs/decisions.md`); LLM-judge scorer added (calibration 86.4% vs engineer-adjudicated labels, `docs/judge.md`); GitHub Actions CI runs `pytest` on push. No fine-tuning yet. See `docs/decisions.md`, `docs/judge.md`, `configs/eval_success_criteria.md`, and `experiments/`.
 > **Author context:** Solo developer, single laptop-class dev machine (see §20).
 > **Document purpose:** Technical roadmap that another engineer (or a future session) can execute without re-deriving decisions.
 > **Last updated:** 2026-08-24
@@ -197,11 +197,14 @@ There is nothing to delete and nothing to break. This plan is the substrate for 
 
 Ranked; full treatment with test/decision in §27.
 
+Ranked; full treatment with test/decision in §27. **Q1–Q3 answered 2026-08-24** — see
+`docs/decisions.md` for the authoritative records.
+
 | # | Question | Priority |
 |---|---|---|
-| Q1 | Start from `gemma3:4b` or switch to **Gemma 4** (newer, possibly more permissive license)? | **Critical** |
-| Q2 | Do you have a cloud GPU budget, and how much? Determines whether fine-tuning is even on the table. | **Critical** |
-| Q3 | Is the goal **personal/educational** or eventual **distribution/commercial**? Changes licensing obligations and data sourcing. | **Critical** |
+| Q1 | ✅ **Answered:** `gemma4:26b` preferred local dev where hardware permits; `gemma3:4b` kept as fallback **and** frozen reproducible baseline (not replaced). | ~~Critical~~ Resolved |
+| Q2 | ✅ **Answered:** No paid GPU. Prefer local → free Colab → free Kaggle. | ~~Critical~~ Resolved |
+| Q3 | ✅ **Answered:** Intended for **distribution** — licensing/provenance/model terms are first-class constraints. | ~~Critical~~ Resolved |
 | Q4 | Can a 4B model clear a *minimum useful bar* on the benchmark at all, even with best prompting? (If not, no amount of fine-tuning saves it.) | **High** |
 | Q5 | What is the target task mix — mostly **blue-team analysis** (plays to 4B strengths) or **CTF solving** (plays to weaknesses)? | **High** |
 | Q6 | Where does authoritative, license-clean cybersecurity training data come from? | **High** |
