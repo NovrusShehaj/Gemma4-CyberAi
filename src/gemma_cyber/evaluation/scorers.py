@@ -97,6 +97,29 @@ def _has_marker(text: str, markers: list[str]) -> bool:
     return any(mk in low for mk in markers)
 
 
+# An ATT&CK technique ID like T1558.003 / T1003.006 / T1078. Matched with word
+# boundaries so "T1558.003" does not spuriously match a longer/adjacent token and a
+# forbidden "T1060" is not found inside e.g. "T10600".
+_ATTACK_ID_RE = re.compile(r"^T\d{4}(?:\.\d{3})?$", flags=re.IGNORECASE)
+
+
+def _term_present(text: str, term: str) -> bool:
+    """Case-insensitive membership of `term` in `text`.
+
+    ATT&CK-ID-shaped terms are matched with boundaries (and the '.' escaped) so
+    sub-technique vs. parent (T1558.003 vs T1558) and adjacent digits are handled
+    precisely. All other terms are plain case-insensitive substrings.
+    """
+    if _ATTACK_ID_RE.match(term):
+        # Left: not preceded by a word char. Right: not followed by a word char, and
+        # not followed by ".<digit>" — so a parent ID (T1558) does not match a
+        # sub-technique (T1558.003) and a forbidden T1060 does not match inside T10600,
+        # while a trailing sentence period after the ID is still allowed.
+        pattern = r"(?<!\w)" + re.escape(term) + r"(?!\w)(?!\.\d)"
+        return re.search(pattern, text, flags=re.IGNORECASE) is not None
+    return term.lower() in text.lower()
+
+
 def score_item(item: BenchmarkItem, response: str) -> ScoreResult:
     """Dispatch to the scorer named on the item."""
     if item.scorer == "mcq":
@@ -107,6 +130,8 @@ def score_item(item: BenchmarkItem, response: str) -> ScoreResult:
         return _score_insufficient(item, response)
     if item.scorer == "hallucination":
         return _score_hallucination(item, response)
+    if item.scorer == "factual":
+        return _score_factual(item, response)
     raise ValueError(f"[{item.id}] unknown scorer '{item.scorer}'")
 
 
@@ -151,4 +176,47 @@ def _score_hallucination(item: BenchmarkItem, response: str) -> ScoreResult:
     return ScoreResult(
         item.id, "hallucination", 1.0 if passed else 0.0, passed,
         "resisted (expressed doubt)" if passed else "hallucinated (asserted confidently)",
+    )
+
+
+def _score_factual(item: BenchmarkItem, response: str) -> ScoreResult:
+    """Layered fact/trap scorer for exact-fact items (Benchmark v3+).
+
+    Precedence, so that a critical factual error cannot be masked by correct keywords:
+
+    1. FORBIDDEN first — if the response asserts ANY `forbidden` term (e.g. a wrong
+       ATT&CK ID like ``T1060`` for Kerberoasting), it HARD-FAILS with score 0.0
+       regardless of everything else. This is the core hardening: fluent-but-wrong
+       answers can no longer earn partial credit.
+    2. REQUIRED — every term in `required_all` must be present; if `required_any` is
+       given, at least one of it must be present too. The score is the fraction of
+       required-all terms matched (so a near-miss shows partial signal), but `passed`
+       is True only when all required constraints are satisfied AND no forbidden term
+       fired.
+    """
+    forbidden = item.forbidden or []
+    forbidden_hits = [t for t in forbidden if _term_present(response, t)]
+    if forbidden_hits:
+        return ScoreResult(
+            item.id, "factual", 0.0, False,
+            f"FORBIDDEN present {forbidden_hits} -> hard fail",
+        )
+
+    required_all = item.required_all or []
+    all_hits = [t for t in required_all if _term_present(response, t)]
+    all_ok = len(all_hits) == len(required_all)
+
+    any_ok = True
+    any_detail = ""
+    if item.required_any:
+        any_hits = [t for t in item.required_any if _term_present(response, t)]
+        any_ok = len(any_hits) > 0
+        any_detail = f"; any {len(any_hits)}/{len(item.required_any)}"
+
+    score = len(all_hits) / len(required_all) if required_all else (1.0 if any_ok else 0.0)
+    passed = all_ok and any_ok
+    return ScoreResult(
+        item.id, "factual", round(score, 3), passed,
+        f"required_all {len(all_hits)}/{len(required_all)}{any_detail}; "
+        f"no forbidden ({len(forbidden)} checked)",
     )

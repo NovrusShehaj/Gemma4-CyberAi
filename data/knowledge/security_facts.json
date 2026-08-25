@@ -1,0 +1,333 @@
+{
+  "schema_version": "1.0",
+  "provenance": "authored for gemma-cyber; ATT&CK IDs verified against MITRE ATT&CK Enterprise (attack.mitre.org). Confirm current mappings at release time — ATT&CK is versioned and mappings can change.",
+  "license": "CC-BY-4.0",
+  "note": "Single source of truth for high-risk cybersecurity facts. Reused by benchmark scorers, the LLM judge rubric, and dataset authoring so a fact is defined once and cannot drift across layers. 'forbidden_ids' are technique IDs commonly confused with the correct one; an answer asserting one of these for this technique is factually wrong.",
+  "attack_techniques": {
+    "kerberoasting": {
+      "id": "T1558.003",
+      "name": "Steal or Forge Kerberos Tickets: Kerberoasting",
+      "parent_id": "T1558",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["kerberoasting", "kerberoast"],
+      "forbidden_ids": ["T1060", "T1068"],
+      "confused_with": {
+        "T1060": "Registry Run Keys / Startup Folder — obsolete ID (superseded by T1547.001), a Persistence technique, entirely unrelated to Kerberos.",
+        "T1068": "Exploitation for Privilege Escalation — a distinct technique under the Privilege Escalation tactic; Kerberoasting does not exploit a software vulnerability.",
+        "T1003.001": "OS Credential Dumping: LSASS Memory — also Credential Access but reads LSASS memory, not offline TGS cracking."
+      },
+      "key_facts": [
+        "Any authenticated domain user can request a TGS (service ticket) for any account with a registered SPN.",
+        "The TGS is encrypted with a key DERIVED FROM the service account's password (the account's NTLM hash for RC4/etype 0x17); the attacker cracks that key offline.",
+        "The primary tactic is Credential Access (TA0006), NOT Privilege Escalation.",
+        "Discovery of Kerberoastable accounts is via SPN enumeration through authenticated LDAP queries to Active Directory."
+      ],
+      "forbidden_claims": [
+        "Kerberos tickets contain the domain administrator password hash",
+        "the ticket contains the account's password hash in plaintext",
+        "Nmap port scanning is the defining discovery mechanism for Kerberoasting",
+        "Kerberoasting is primarily a privilege escalation technique",
+        "session-ID manipulation is required to perform Kerberoasting"
+      ]
+    },
+    "asrep_roasting": {
+      "id": "T1558.004",
+      "name": "Steal or Forge Kerberos Tickets: AS-REP Roasting",
+      "parent_id": "T1558",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["as-rep roasting", "asrep roasting", "as rep roasting"],
+      "forbidden_ids": ["T1558.003"],
+      "confused_with": {
+        "T1558.003": "Kerberoasting — targets accounts with an SPN via the TGS; AS-REP Roasting instead targets accounts with Kerberos pre-authentication disabled via the AS-REP."
+      },
+      "key_facts": [
+        "Requires the target account to have 'Do not require Kerberos preauthentication' set (DONT_REQ_PREAUTH in userAccountControl).",
+        "The DC returns an AS-REP whose encrypted portion is derived from the account's password; the attacker cracks it offline.",
+        "Unlike Kerberoasting, no SPN is required."
+      ],
+      "forbidden_claims": []
+    },
+    "lsass_dumping": {
+      "id": "T1003.001",
+      "name": "OS Credential Dumping: LSASS Memory",
+      "parent_id": "T1003",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["lsass dumping", "lsass memory", "sekurlsa"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Reads credential material (NTLM hashes, Kerberos tickets, sometimes plaintext) from the memory of the LSASS process.",
+        "Detected via Sysmon Event ID 10 (ProcessAccess) handles to lsass.exe with read access masks."
+      ],
+      "forbidden_claims": []
+    },
+    "dcsync": {
+      "id": "T1003.006",
+      "name": "OS Credential Dumping: DCSync",
+      "parent_id": "T1003",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["dcsync"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Abuses the Directory Replication Service (DRSUAPI, DRSGetNCChanges) to request password data as if the attacker were a domain controller.",
+        "Requires replication rights (DS-Replication-Get-Changes / -All); no code runs on the DC.",
+        "Detected via Event ID 4662 with the replication extended-right GUIDs from a non-DC source."
+      ],
+      "forbidden_claims": []
+    },
+    "pass_the_hash": {
+      "id": "T1550.002",
+      "name": "Use Alternate Authentication Material: Pass the Hash",
+      "parent_id": "T1550",
+      "tactic": "Defense Evasion, Lateral Movement",
+      "tactic_id": "TA0005",
+      "aliases": ["pass the hash", "pass-the-hash", "pth"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Authenticates using a captured NTLM hash directly, without knowing or cracking the plaintext password.",
+        "Applies to NTLM authentication; it does not work against Kerberos-only flows (see Overpass-the-Hash / Pass-the-Ticket)."
+      ],
+      "forbidden_claims": []
+    },
+    "llmnr_nbtns_poisoning": {
+      "id": "T1557.001",
+      "name": "Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay",
+      "parent_id": "T1557",
+      "tactic": "Credential Access, Collection",
+      "tactic_id": "TA0006",
+      "aliases": ["llmnr poisoning", "nbt-ns poisoning", "responder", "smb relay"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Poisons LLMNR/NBT-NS name-resolution fallback to capture NetNTLM challenge/response hashes.",
+        "Captured NetNTLMv2 hashes can be cracked offline or relayed to another host (SMB relay)."
+      ],
+      "forbidden_claims": []
+    },
+    "powershell": {
+      "id": "T1059.001",
+      "name": "Command and Scripting Interpreter: PowerShell",
+      "parent_id": "T1059",
+      "tactic": "Execution",
+      "tactic_id": "TA0002",
+      "aliases": ["powershell"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Execution of commands/scripts via PowerShell; -EncodedCommand and hidden windows are common obfuscation."
+      ],
+      "forbidden_claims": []
+    },
+    "valid_accounts": {
+      "id": "T1078",
+      "name": "Valid Accounts",
+      "parent_id": null,
+      "tactic": "Defense Evasion, Persistence, Privilege Escalation, Initial Access",
+      "tactic_id": "TA0005",
+      "aliases": ["valid accounts"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Use of legitimate credentials for access; spans multiple tactics."
+      ],
+      "forbidden_claims": []
+    },
+    "smb_admin_shares": {
+      "id": "T1021.002",
+      "name": "Remote Services: SMB/Windows Admin Shares",
+      "parent_id": "T1021",
+      "tactic": "Lateral Movement",
+      "tactic_id": "TA0008",
+      "aliases": ["smb admin shares", "psexec", "admin$", "c$"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Lateral movement over SMB to administrative shares (ADMIN$, C$), e.g. PsExec-style service creation."
+      ],
+      "forbidden_claims": []
+    },
+    "password_spraying": {
+      "id": "T1110.003",
+      "name": "Brute Force: Password Spraying",
+      "parent_id": "T1110",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["password spraying", "password spray"],
+      "forbidden_ids": ["T1110.001"],
+      "confused_with": {
+        "T1110.001": "Password Guessing brute-forces MANY passwords against ONE account; spraying tries FEW common passwords across MANY accounts to avoid lockout."
+      },
+      "key_facts": [
+        "Tries a small number of common passwords across MANY accounts to avoid lockout, unlike per-account brute force (T1110.001)."
+      ],
+      "forbidden_claims": []
+    },
+    "ntds_dumping": {
+      "id": "T1003.003",
+      "name": "OS Credential Dumping: NTDS",
+      "parent_id": "T1003",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["ntds.dit", "ntds dumping"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Extracts the AD database file NTDS.dit (all domain account hashes) from a domain controller, often via a Volume Shadow Copy.",
+        "Distinct from DCSync (T1003.006), which pulls the same secrets over the replication protocol without touching the file."
+      ],
+      "forbidden_claims": []
+    },
+    "sam_dumping": {
+      "id": "T1003.002",
+      "name": "OS Credential Dumping: Security Account Manager",
+      "parent_id": "T1003",
+      "tactic": "Credential Access",
+      "tactic_id": "TA0006",
+      "aliases": ["sam hive", "sam dumping"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Reads local account NT hashes from the SAM registry hive on a single host (needs SYSTEM); scope is local accounts, not domain accounts."
+      ],
+      "forbidden_claims": []
+    },
+    "registry_run_keys": {
+      "id": "T1547.001",
+      "name": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+      "parent_id": "T1547",
+      "tactic": "Persistence, Privilege Escalation",
+      "tactic_id": "TA0003",
+      "aliases": ["registry run keys", "startup folder", "run key persistence"],
+      "forbidden_ids": ["T1060"],
+      "confused_with": {
+        "T1060": "The OLD, now-deprecated ID for this same behavior. Current ATT&CK uses T1547.001; T1060 is retired."
+      },
+      "key_facts": [
+        "Persists by adding a program to a Run/RunOnce registry key or the Startup folder so it launches at logon/boot.",
+        "This is the technique that used to be numbered T1060 before ATT&CK restructured autostart execution under T1547."
+      ],
+      "forbidden_claims": []
+    },
+    "scheduled_task": {
+      "id": "T1053.005",
+      "name": "Scheduled Task/Job: Scheduled Task",
+      "parent_id": "T1053",
+      "tactic": "Execution, Persistence, Privilege Escalation",
+      "tactic_id": "TA0002",
+      "aliases": ["scheduled task", "schtasks"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Uses the Windows Task Scheduler (schtasks / Event ID 4698 on creation) for execution and persistence, sometimes as SYSTEM."
+      ],
+      "forbidden_claims": []
+    },
+    "windows_service": {
+      "id": "T1543.003",
+      "name": "Create or Modify System Process: Windows Service",
+      "parent_id": "T1543",
+      "tactic": "Persistence, Privilege Escalation",
+      "tactic_id": "TA0003",
+      "aliases": ["windows service persistence", "new service"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Installs or modifies a Windows service (Event ID 7045) to run as SYSTEM at boot; PsExec-style lateral movement also creates a service."
+      ],
+      "forbidden_claims": []
+    },
+    "data_encrypted_impact": {
+      "id": "T1486",
+      "name": "Data Encrypted for Impact",
+      "parent_id": null,
+      "tactic": "Impact",
+      "tactic_id": "TA0040",
+      "aliases": ["ransomware encryption", "data encrypted for impact"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "The ransomware encryption step itself (Impact tactic). Do not confuse with the recovery-inhibition step, Inhibit System Recovery (T1490)."
+      ],
+      "forbidden_claims": []
+    },
+    "inhibit_recovery": {
+      "id": "T1490",
+      "name": "Inhibit System Recovery",
+      "parent_id": null,
+      "tactic": "Impact",
+      "tactic_id": "TA0040",
+      "aliases": ["inhibit system recovery", "delete shadow copies"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Deletes backups/shadow copies to block restoration, e.g. 'vssadmin delete shadows /all /quiet' or wbadmin; detect via Event ID 4688 for those commands."
+      ],
+      "forbidden_claims": []
+    },
+    "exploit_public_app": {
+      "id": "T1190",
+      "name": "Exploit Public-Facing Application",
+      "parent_id": null,
+      "tactic": "Initial Access",
+      "tactic_id": "TA0001",
+      "aliases": ["exploit public-facing application", "exploit internet-facing"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Initial access by exploiting an internet-facing app/service (e.g. a web app RCE, a VPN appliance flaw)."
+      ],
+      "forbidden_claims": []
+    },
+    "web_c2": {
+      "id": "T1071.001",
+      "name": "Application Layer Protocol: Web Protocols",
+      "parent_id": "T1071",
+      "tactic": "Command and Control",
+      "tactic_id": "TA0011",
+      "aliases": ["c2 over http", "web protocols c2"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "C2 traffic blended into HTTP/HTTPS to look like normal web browsing; sibling T1071.004 is DNS."
+      ],
+      "forbidden_claims": []
+    },
+    "account_manipulation": {
+      "id": "T1098",
+      "name": "Account Manipulation",
+      "parent_id": null,
+      "tactic": "Persistence, Privilege Escalation",
+      "tactic_id": "TA0003",
+      "aliases": ["account manipulation"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Modifying accounts to keep or elevate access (adding to a privileged group, adding credentials/keys, cloud role changes)."
+      ],
+      "forbidden_claims": []
+    },
+    "rundll32": {
+      "id": "T1218.011",
+      "name": "System Binary Proxy Execution: Rundll32",
+      "parent_id": "T1218",
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["rundll32"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Abuses the signed rundll32.exe to execute code (DLL export or via .inf/JS), proxying execution past naive allowlists."
+      ],
+      "forbidden_claims": []
+    }
+  },
+  "obsolete_ids": {
+    "T1060": "Registry Run Keys / Startup Folder — an OLD ATT&CK ID that was superseded by T1547.001 (Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder). It is a Persistence technique and has never been Kerberoasting."
+  }
+}

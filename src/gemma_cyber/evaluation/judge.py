@@ -38,7 +38,10 @@ from gemma_cyber.evaluation.schema import BenchmarkItem
 from gemma_cyber.evaluation.scorers import ScoreResult
 
 # Bump when the grading prompt changes so calibration/results stay attributable.
-JUDGE_PROMPT_VERSION = "judge-v1"
+# judge-v2 (2026-08-25): rubric reweighted to put TECHNICAL CORRECTNESS ahead of writing
+# quality, with an explicit critical-error override. Re-run calibration before citing
+# judge numbers against a judge-v1 baseline (see docs/judge.md).
+JUDGE_PROMPT_VERSION = "judge-v2"
 
 DEFAULT_JUDGE_MODEL = "gemma4:26b-a4b-it-q8_0"
 DEFAULT_JUDGE_NUM_PREDICT = 320
@@ -46,9 +49,19 @@ DEFAULT_JUDGE_NUM_PREDICT = 320
 JUDGE_SYSTEM_PROMPT = (
     "You are a strict, fair grader for a cybersecurity evaluation benchmark. You are given "
     "a task, a reference describing what a correct answer must do, and a candidate answer. "
-    "Decide whether the candidate answer is correct for the task. Grade by MEANING, not "
-    "exact wording: synonyms, paraphrases, and equivalent technical explanations count as "
-    "correct. Do not reward confident-sounding but wrong or fabricated content. "
+    "Decide whether the candidate answer is correct for the task.\n"
+    "Grade on TECHNICAL CORRECTNESS FIRST, not writing quality. A fluent, confident, "
+    "well-structured answer that is technically wrong must FAIL. A short, plain answer that "
+    "is technically correct should PASS.\n"
+    "Prioritize, in order: (1) factual correctness of the security claims; (2) correct "
+    "MITRE ATT&CK technique/tactic IDs; (3) correct protocol/cryptographic mechanics; "
+    "(4) evidence grounding — claims must be supported by the given evidence and not "
+    "over-reach; (5) no unsupported or fabricated details; (6) calibrated confidence; "
+    "(7) safety; (8) completeness of the essential point.\n"
+    "CRITICAL-ERROR OVERRIDE: if the answer states a wrong ATT&CK ID, a fabricated "
+    "CVE/tool/flag, or a false protocol claim, it FAILS even if it also contains several "
+    "correct statements. Grade by MEANING (synonyms/paraphrases are fine); do not require "
+    "exact wording; do not reward confident-sounding but wrong content.\n"
     "Respond with ONLY a single JSON object on one line, no markdown, no code fence, "
     'exactly: {"verdict": "PASS" or "FAIL", "score": <number 0.0-1.0>, '
     '"reason": "<one short sentence>"}.'
@@ -117,6 +130,22 @@ def build_reference(item: BenchmarkItem) -> str:
             "the candidate flags, doubts, or denies the fabricated premise rather than "
             "confidently inventing details about it."
         )
+    if item.scorer == "factual":
+        req_all = ", ".join(item.required_all or []) or "(none)"
+        req_any = ", ".join(item.required_any or [])
+        forbidden = ", ".join(item.forbidden or []) or "(none)"
+        lines = [
+            "This is an EXACT-FACT question. Correctness hinges on specific technical facts.",
+            f"The answer MUST convey all of these facts/IDs: {req_all}.",
+        ]
+        if req_any:
+            lines.append(f"The answer must also convey at least one of: {req_any}.")
+        lines.append(
+            f"The answer must NOT assert any of these (they are factually wrong here): "
+            f"{forbidden}. If it asserts any forbidden item, FAIL regardless of what else "
+            "it gets right."
+        )
+        return " ".join(lines)
     return "PASS if the candidate answer is correct and relevant to the question."
 
 

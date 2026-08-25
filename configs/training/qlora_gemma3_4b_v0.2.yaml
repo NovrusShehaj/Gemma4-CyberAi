@@ -1,0 +1,64 @@
+# Training configuration for Gemma-Cyber v0.2 (exp-002) — the FIRST real fine-tune.
+# Architecture: QLoRA (4-bit NF4 quantized base + BF16 Low-Rank Adapters).
+# Target Base Model: google/gemma-3-4b-it (the HF equivalent of the Ollama gemma3:4b anchor).
+#
+# Fits a free Colab/Kaggle T4/L4 session (per docs/decisions.md Q2): 4-bit base, r=16
+# adapters, seq_len 1024, micro-batch 2 x grad-accum 4 (effective 8), gradient checkpointing.
+#
+# Gemma-3 chat-template caveat (verify in the notebook before the full run): Gemma chat
+# templates historically DO NOT accept a standalone `system` role and expect system content
+# folded into the first user turn. sft_v0.2 uses system messages, so the training run MUST
+# confirm `tokenizer.apply_chat_template(messages, ...)` succeeds on google/gemma-3-4b-it, or
+# fold the system message into the first user message. This is called out in
+# notebooks/colab_qlora_training.ipynb and docs/decisions.md.
+
+model:
+  base_model_name_or_path: "google/gemma-3-4b-it"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  use_auth_token: true
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_compute_dtype: "bfloat16"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+data:
+  train_dataset_path: "data/training/sft_v0.2.jsonl"
+  max_seq_length: 1024   # v0.2 answers are concise; 1024 covers them and halves T4 memory vs 2048
+  packing: false
+
+training:
+  output_dir: "experiments/exp-002-gemma3-cyber-v0.2/checkpoints"
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  learning_rate: 0.0002
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  optim: "paged_adamw_8bit"
+  logging_steps: 10
+  save_strategy: "epoch"
+  save_total_limit: 2
+  seed: 42
+  report_to: "none"
+  bf16: true
+  fp16: false

@@ -67,3 +67,59 @@ def test_hallucination_scorer():
     assert ok.passed
     bad = score_item(item, "CVE-2029-88888 is a buffer overflow in Apache 2.9, patched in 2.9.1.")
     assert not bad.passed
+
+
+# --- factual scorer (Benchmark v3) -----------------------------------------------------
+
+def _factual(required_all=None, required_any=None, forbidden=None):
+    return BenchmarkItem(
+        id="f", category="attack_mapping", domain="blue_team", scorer="factual",
+        question="What is the ATT&CK ID and tactic for Kerberoasting?",
+        required_all=required_all, required_any=required_any, forbidden=forbidden,
+    )
+
+
+def test_factual_pass_when_required_present_no_forbidden():
+    item = _factual(required_all=["T1558.003", "Credential Access"], forbidden=["T1060", "T1068"])
+    resp = "Kerberoasting is T1558.003 under the Credential Access tactic (TA0006)."
+    res = score_item(item, resp)
+    assert res.passed and res.score == 1.0
+
+
+def test_factual_forbidden_hard_fails_even_with_correct_keywords():
+    """The core hardening: a wrong ATT&CK ID cannot be masked by correct keywords.
+
+    This is the exact v0.1 failure mode (Kerberoasting -> T1060 while still mentioning
+    'ticket' and 'service account'). It MUST score 0.0 and fail.
+    """
+    item = _factual(required_all=["T1558.003"], forbidden=["T1060", "T1068"])
+    resp = ("Kerberoasting is T1060. The attacker requests a service ticket for a "
+            "service account and cracks it offline. It also maps to T1558.003.")
+    res = score_item(item, resp)
+    assert not res.passed and res.score == 0.0
+    assert "FORBIDDEN" in res.detail
+
+
+def test_factual_partial_when_required_missing():
+    item = _factual(required_all=["T1558.003", "Credential Access"], forbidden=["T1060"])
+    resp = "Kerberoasting is T1558.003."  # missing the tactic
+    res = score_item(item, resp)
+    assert not res.passed and 0.0 < res.score < 1.0
+
+
+def test_factual_id_boundary_precision():
+    """T1558 (parent) must NOT satisfy a requirement for the sub-technique T1558.003,
+    and a forbidden T1060 must not be found inside an unrelated token like T10600."""
+    item = _factual(required_all=["T1558.003"], forbidden=["T1060"])
+    # Parent-only mention does not count as the sub-technique.
+    assert not score_item(item, "This is Kerberos technique T1558 generally.").passed
+    # Forbidden ID embedded in a longer number must not fire a false positive.
+    ok = score_item(item, "See doc ref T10600 and the technique is T1558.003.")
+    assert ok.passed, ok.detail
+
+
+def test_factual_requires_constraints_at_schema_level():
+    import pytest
+    with pytest.raises(ValueError):
+        BenchmarkItem(id="bad", category="c", domain="general", scorer="factual",
+                      question="q")
