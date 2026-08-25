@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-Scorer = Literal["mcq", "keyword", "insufficient_evidence", "hallucination"]
+Scorer = Literal["mcq", "keyword", "insufficient_evidence", "hallucination", "factual"]
 Split = Literal["dev", "test"]
 
 
@@ -52,6 +52,16 @@ class BenchmarkItem(BaseModel):
     expected_keywords: list[str] | None = None  # keyword scorer
     keyword_threshold: float = 0.5  # fraction of keywords required to pass
 
+    # `factual` scorer (Benchmark v3+): layered fact/trap checking. A response that
+    # contains ANY `forbidden` term hard-fails (score 0) regardless of other content,
+    # so a correct-sounding answer that also asserts a wrong ATT&CK ID cannot pass.
+    # `required_all` terms must all be present; `required_any` (if given) needs >=1.
+    # Terms are matched with word boundaries when they look like ATT&CK IDs, else as
+    # case-insensitive substrings. See scorers._score_factual.
+    required_all: list[str] | None = None
+    required_any: list[str] | None = None
+    forbidden: list[str] | None = None
+
     # provenance / licensing (PROJECT_PLAN.md §16)
     source: str = "original"
     license: str = "CC-BY-4.0"
@@ -67,6 +77,10 @@ class BenchmarkItem(BaseModel):
                 raise ValueError(f"[{self.id}] answer '{self.answer}' not in choices")
         if self.scorer == "keyword" and not self.expected_keywords:
             raise ValueError(f"[{self.id}] keyword items require 'expected_keywords'")
+        if self.scorer == "factual" and not (self.required_all or self.required_any):
+            raise ValueError(
+                f"[{self.id}] factual items require 'required_all' and/or 'required_any'"
+            )
         return self
 
     def render_prompt(self) -> str:

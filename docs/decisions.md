@@ -2,6 +2,62 @@
 
 Meaningful decisions and deviations from `PROJECT_PLAN.md`, newest first.
 
+## 2026-08-25 — SFT v0.2, benchmark v3, evaluation hardening, exp-002 prep
+
+Evaluation-first hardening + a genuinely diverse dataset, preparing the **first real**
+fine-tune. Historical artifacts (v1/v2 benchmarks, sft_v0.1 builder, exp-001) unchanged.
+
+- **Corrected the record: `gemma3-cyber:v0.1` was never fine-tuned.** Its `Modelfile` is
+  `FROM gemma3:4b` + a system prompt; exp-001 responses are 66/67 identical to the base and
+  its scorecard equals the base. The "Kerberoasting → T1060" failure is **base-model**
+  behavior. exp-002 (this milestone) is the first real training run. Not rewriting exp-001;
+  documented in `docs/experiments/exp-002.md`.
+- **Root cause of the failure (evidence).** (1) `sft_v0.1` has **360 rows but only 91 unique
+  answers** — the builder cloned each answer 5–10× via `for var in range(...)` loops. (2)
+  The exact ID `T1558.003` appears **0×** in training and **0×** in `benchmark_v2`, so it
+  was neither taught nor tested. (3) The `keyword` scorer would give partial credit to a
+  "T1060" answer. So the problem is **dataset diversity + evaluation blindness**, not the
+  architecture.
+- **Fact registry (single source of truth).** `data/knowledge/security_facts.json` +
+  `src/gemma_cyber/knowledge/facts.py`: verified ATT&CK IDs/tactics/mechanics with
+  `forbidden_ids` (common confusions) and `obsolete_ids` (e.g. T1060 → T1547.001). Reused by
+  scorers, the judge rubric, and the dataset builder so a fact is defined **once** and
+  cannot drift. ATT&CK IDs verified against MITRE ATT&CK Enterprise at authoring time (must
+  be re-confirmed at release — ATT&CK is versioned).
+- **`factual` scorer (evaluation-first fix).** New deterministic scorer:
+  `forbidden` hit → **hard fail (0.0)** regardless of correct keywords; `required_all` /
+  `required_any` must be satisfied to pass. ATT&CK-ID matching uses word boundaries so
+  T1558 ≠ T1558.003 and forbidden T1060 ≠ T10600. Added behind the existing dispatch;
+  v1/v2 scorers unchanged. Locked by tests, incl. the exact T1060 failure text.
+- **Judge rubric → `judge-v2`.** Reweighted to put **technical correctness first** (facts →
+  ATT&CK IDs → protocol → evidence grounding → …), with an explicit critical-error override
+  (wrong ATT&CK ID / fabricated artifact / false protocol claim → FAIL even if other content
+  is correct). Fail-safe parsing unchanged. **Calibration must be re-run** before citing
+  judge numbers against the judge-v1 baseline (deterministic scorers remain primary).
+- **`sft_v0.2` (277 items, 277 unique answers).** New builder `builder_v2.py` (v0.1 builder
+  frozen). No clone loops — a `_Deduper` raises on any identical answer. ATT&CK-precision +
+  contrastive + chain-mapping families are **registry-driven** (35 verified techniques, each
+  genuinely distinct). Diversity measured by `validate_dataset.py` (new): **v0.1 = 91/360
+  unique, 1145 near-dup pairs → v0.2 = 277/277, 0 near-dups.** 15 task types; schema-valid;
+  contamination-clean vs v1/v2/v3 at 0.5. **Quality-over-quota:** built genuinely-distinct
+  content toward the ~300 range rather than padding to 500–700 with filler; the builder
+  scales cleanly (each registry technique = +1–2 items, zero dup risk).
+- **`benchmark_v3` (47 items).** Targeted sensitivity instrument (ATT&CK precision, false
+  premises, protocol mechanics, hallucination, evidence attribution) with explicit stratified
+  dev/test (35/12), built by `scripts/build_benchmark_v3.py`. **v2 stays the frozen
+  do-no-harm anchor; v3 is not comparable head-to-head** (new scorer + harder distribution)
+  — separate baselines/targets documented in `configs/eval_success_criteria.md` §7.
+- **Gemma-3 formatting.** `src/gemma_cyber/data/formatting.py::to_gemma_chat_text` renders
+  the canonical Gemma turn format, **folding the `system` role into the first user turn** and
+  emitting `model` turns — because Gemma chat templates historically reject a standalone
+  `system` role. Tested over every v0.2 item. The Colab notebook now uses it + completion-only
+  masking (loss on `model` turns) and points at `sft_v0.2`, seq_len 1024.
+- **Training config.** New `configs/training/qlora_gemma3_4b_v0.2.yaml` (→ sft_v0.2, exp-002
+  output dir, seq_len 1024 for T4 headroom); v0.1 config preserved. Dry-run passes
+  (dataset + config verified; no local GPU, cloud-only per Q2).
+- **Tests:** 90 passing (added factual-scorer, fact-registry, formatting, benchmark_v3
+  suites). ruff + mypy clean.
+
 ## 2026-08-24 — P1 evaluation hardening: LLM-judge scorer + CI
 
 Evaluation-hardening work (no training; the model is unchanged). Deterministic scorers and

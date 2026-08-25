@@ -24,9 +24,35 @@ from pathlib import Path
 # Ensure src is in python path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from gemma_cyber.data.contamination import check_contamination  # noqa: E402
+from gemma_cyber.data.contamination import check_contamination, jaccard_similarity  # noqa: E402
 from gemma_cyber.data.schema import TrainingItem, load_training_dataset  # noqa: E402
 from gemma_cyber.evaluation.schema import load_benchmark  # noqa: E402
+
+
+def assistant_uniqueness(items: list[TrainingItem]) -> dict:
+    """Measure answer-level diversity, the metric v0.1 failed (91 unique of 360).
+
+    Returns exact-unique-answer count and a list of near-duplicate answer pairs
+    (word-trigram Jaccard >= 0.9) that indicate superficial copy-paste variation.
+    """
+    answers = [
+        next((m.content for m in it.messages if m.role == "assistant"), "")
+        for it in items
+    ]
+    ids = [it.id for it in items]
+    exact_unique = len({" ".join(a.split()).lower() for a in answers})
+    near_dups: list[tuple[str, str, float]] = []
+    for i in range(len(answers)):
+        for j in range(i + 1, len(answers)):
+            sim = jaccard_similarity(answers[i], answers[j], n=3)
+            if sim >= 0.9:
+                near_dups.append((ids[i], ids[j], round(sim, 3)))
+    return {
+        "total": len(items),
+        "exact_unique_answers": exact_unique,
+        "unique_ratio": round(exact_unique / len(items), 3) if items else 0.0,
+        "near_duplicate_pairs": near_dups,
+    }
 
 
 def summarize_dataset(items: list[TrainingItem]) -> dict:
@@ -97,6 +123,21 @@ def main() -> int:
     print(f"  Fabricated Premise (Traps): {stats['fabricated_premise_count']}")
     print(f"  Requires Evidence: {stats['requires_evidence_count']}")
     print(f"  Licenses: {stats['licenses']}")
+
+    # Answer-level diversity (the metric v0.1 failed: 91 unique answers of 360).
+    uniq = assistant_uniqueness(items)
+    print("\nDiversity (assistant answers):")
+    print(
+        f"  Exact-unique answers: {uniq['exact_unique_answers']}/{uniq['total']} "
+        f"(ratio {uniq['unique_ratio']})"
+    )
+    if uniq["near_duplicate_pairs"]:
+        print(f"  WARNING: {len(uniq['near_duplicate_pairs'])} near-duplicate answer "
+              f"pair(s) (Jaccard >= 0.9):")
+        for a_id, b_id, sim in uniq["near_duplicate_pairs"][:10]:
+            print(f"    {a_id} ~ {b_id} ({sim})")
+    else:
+        print("  No near-duplicate answer pairs (Jaccard >= 0.9).")
 
     # Contamination check if requested
     if args.check_contamination:

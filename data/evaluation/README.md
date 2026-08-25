@@ -14,10 +14,25 @@ reproducibly, *"did a change (prompt, RAG, or fine-tune) measurably help?"*
 | File | Items | Split | Status |
 |---|---:|---|---|
 | `benchmark_v1.jsonl` | 25 | none (all treated as `dev`) | **Frozen, historical.** Do not edit. |
-| `benchmark_v2.jsonl` | 112 | `dev` / `test` | **Frozen.** The current evaluation instrument. |
+| `benchmark_v2.jsonl` | 112 | `dev` / `test` | **Frozen.** The overall do-no-harm / regression anchor. |
+| `benchmark_v3.jsonl` | 47 | `dev` / `test` (35/12) | **Targeted sensitivity instrument** (ATT&CK precision, false premises, factual scorer). Not comparable head-to-head with v2. |
 
-Both are **100% original**, authored for this project, licensed CC-BY-4.0, with no
+All are **100% original**, authored for this project, licensed CC-BY-4.0, with no
 Hack The Box / TryHackMe or other third-party content.
+
+### Why v3 exists (and why it does not replace v2)
+
+`benchmark_v2` has an `attack_mapping` category but **zero** items testing the *exact*
+ATT&CK ID for Kerberoasting, and its `keyword` scorer would award partial credit to an
+answer that says "T1060" as long as it also says "ticket" — so v2 is **blind to the exact
+v0.1 failure**. `benchmark_v3` adds that sensitivity: exact-fact items scored by the new
+**`factual`** scorer (`required_all` IDs + **`forbidden`** wrong IDs → hard fail), driven
+by the verified fact registry (`data/knowledge/security_facts.json`) so training data,
+benchmark, and scorer cite the **same** fact and cannot drift. Because v3 uses a new scorer
+and a harder distribution, **it is not comparable to v2 head-to-head** — report v2
+(do-no-harm) and v3 (targeted) separately, each with its own baseline (see
+`configs/eval_success_criteria.md` §7 and `docs/experiments/exp-002.md`). v3 is built
+deterministically by `scripts/build_benchmark_v3.py`; v1/v2 remain unchanged.
 
 ### Why v2 exists
 
@@ -38,9 +53,12 @@ Each line is one JSON object validated by
 
 - `id` — stable unique identifier (v2 ids are disjoint from v1).
 - `category`, `domain` (`blue_team` | `offensive_ctf` | `general`), `difficulty`.
-- `scorer` — `mcq` | `keyword` | `insufficient_evidence` | `hallucination` (deterministic).
+- `scorer` — `mcq` | `keyword` | `insufficient_evidence` | `hallucination` | `factual`
+  (all deterministic).
 - prompt fields: `question`, optional `context` / `evidence` / `choices`.
-- scoring fields: `answer` (mcq), `expected_keywords` + `keyword_threshold` (keyword).
+- scoring fields: `answer` (mcq), `expected_keywords` + `keyword_threshold` (keyword),
+  `required_all` / `required_any` / `forbidden` (`factual` — a `forbidden` hit hard-fails
+  the item regardless of other content).
 - provenance: `source`, `license`, `provenance` (all mandatory).
 - **`split`** — `dev` | `test` (see below). Defaults to `dev` for pre-split files.
 

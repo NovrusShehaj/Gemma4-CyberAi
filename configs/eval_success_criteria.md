@@ -167,3 +167,34 @@ python scripts/run_baseline.py --benchmark data/evaluation/benchmark_v2.jsonl \
 python scripts/run_baseline.py --benchmark data/evaluation/benchmark_v2.jsonl \
     --split test --out experiments/baseline_gemma3-4b_v2/test
 ```
+
+---
+
+## 7. Addendum (2026-08-25) — Benchmark v3 targeted instrument
+
+> **The §1–§6 v2 criteria above are FROZEN and unchanged.** This addendum *adds* a second,
+> non-substitutable instrument. It does not relax any v2 threshold.
+
+`benchmark_v3.jsonl` (47 items, `factual`/`mcq`/`hallucination`/`keyword`/
+`insufficient_evidence`) targets the *exact* v0.1 failure that v2 cannot see: exact ATT&CK
+IDs (Kerberoasting = **T1558.003**, not T1060/T1068), false premises, and protocol
+mechanics. It uses the new **`factual`** scorer (required IDs + **forbidden** wrong IDs →
+hard fail), so a fluent answer containing a wrong ID cannot earn credit.
+
+**Not comparable to v2.** v3 uses a different scorer and a deliberately harder distribution.
+Do **not** compare a v3 number to a v2 number. Each is scored against **its own base
+`gemma3:4b` baseline**, measured as the control arm of the same experiment (no base-on-v3
+number pre-dates this addendum, so it is measured, not assumed).
+
+**v3 pre-registered targets (for exp-002 and later), evaluated on `test`:**
+- `attack_mapping` (factual + mcq) pass_rate ≥ **+40 pp** over base-on-v3, **and** the
+  flagship item `v3-attack-kerberoasting-t1060-trap` flips **fail → pass**.
+- `false_premise` pass_rate ≥ **+33 pp** over base-on-v3.
+
+**Guard:** the v2 do-no-harm criteria (§4.2–§4.3) still apply unchanged and are evaluated on
+`benchmark_v2` `test`. A v3 gain that comes with a v2 regression is **not** a pass.
+
+Rationale for setting these before the candidate exists: the base model demonstrably
+hallucinates the exact IDs, so any genuine acquisition of exact-fact behavior clears these
+floors, while plausible-prose output (which the `factual` scorer hard-fails on a wrong ID)
+will not. Thresholds are frozen per the header; change only via a new dated addendum.
