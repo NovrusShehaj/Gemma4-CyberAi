@@ -34,13 +34,14 @@ fine-tune. Historical artifacts (v1/v2 benchmarks, sft_v0.1 builder, exp-001) un
   (wrong ATT&CK ID / fabricated artifact / false protocol claim → FAIL even if other content
   is correct). Fail-safe parsing unchanged. **Calibration must be re-run** before citing
   judge numbers against the judge-v1 baseline (deterministic scorers remain primary).
-- **`sft_v0.2` (137 items, 137 unique answers).** New builder `builder_v2.py` (v0.1 builder
+- **`sft_v0.2` (277 items, 277 unique answers).** New builder `builder_v2.py` (v0.1 builder
   frozen). No clone loops — a `_Deduper` raises on any identical answer. ATT&CK-precision +
-  contrastive family is **registry-driven** (each technique genuinely distinct). Diversity
-  measured by `validate_dataset.py` (new): **v0.1 = 91/360 unique, 1145 near-dup pairs →
-  v0.2 = 137/137, 0 near-dups.** Schema-valid; contamination-clean vs v1/v2/v3 at 0.5.
-  **Quality-over-quota:** deliberately below the 500–700 suggestion — 137 genuinely-distinct
-  beats padded filler and the builder scales cleanly (each registry technique = +2 items).
+  contrastive + chain-mapping families are **registry-driven** (35 verified techniques, each
+  genuinely distinct). Diversity measured by `validate_dataset.py` (new): **v0.1 = 91/360
+  unique, 1145 near-dup pairs → v0.2 = 277/277, 0 near-dups.** 15 task types; schema-valid;
+  contamination-clean vs v1/v2/v3 at 0.5. **Quality-over-quota:** built genuinely-distinct
+  content toward the ~300 range rather than padding to 500–700 with filler; the builder
+  scales cleanly (each registry technique = +1–2 items, zero dup risk).
 - **`benchmark_v3` (47 items).** Targeted sensitivity instrument (ATT&CK precision, false
   premises, protocol mechanics, hallucination, evidence attribution) with explicit stratified
   dev/test (35/12), built by `scripts/build_benchmark_v3.py`. **v2 stays the frozen

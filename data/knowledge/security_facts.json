@@ -325,6 +325,330 @@
         "Abuses the signed rundll32.exe to execute code (DLL export or via .inf/JS), proxying execution past naive allowlists."
       ],
       "forbidden_claims": []
+    },
+    "process_injection": {
+      "id": "T1055",
+      "name": "Process Injection",
+      "parent_id": null,
+      "tactic": "Defense Evasion, Privilege Escalation",
+      "tactic_id": "TA0005",
+      "aliases": ["process injection", "process hollowing", "dll injection"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Runs code in the address space of another live process to evade defenses and inherit its context; sub-techniques include DLL injection and process hollowing."
+      ],
+      "forbidden_claims": []
+    },
+    "modify_registry": {
+      "id": "T1112",
+      "name": "Modify Registry",
+      "parent_id": null,
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["modify registry"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Changes registry keys/values to hide configuration, disable security tooling, or support other techniques."
+      ],
+      "forbidden_claims": []
+    },
+    "local_account_create": {
+      "id": "T1136.001",
+      "name": "Create Account: Local Account",
+      "parent_id": "T1136",
+      "tactic": "Persistence",
+      "tactic_id": "TA0003",
+      "aliases": ["create local account", "net user add"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Creates a new local account (Event ID 4720) for persistent access; the domain variant is T1136.002."
+      ],
+      "forbidden_claims": []
+    },
+    "service_execution": {
+      "id": "T1569.002",
+      "name": "System Services: Service Execution",
+      "parent_id": "T1569",
+      "tactic": "Execution",
+      "tactic_id": "TA0002",
+      "aliases": ["service execution", "psexec service"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Executes a payload by creating/starting a Windows service (Event ID 7045); the PsExec execution mechanism."
+      ],
+      "forbidden_claims": []
+    },
+    "dns_c2": {
+      "id": "T1071.004",
+      "name": "Application Layer Protocol: DNS",
+      "parent_id": "T1071",
+      "tactic": "Command and Control",
+      "tactic_id": "TA0011",
+      "aliases": ["dns c2", "dns command and control"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "C2 traffic tunneled through DNS queries/responses; sibling of DNS exfiltration (T1048.003)."
+      ],
+      "forbidden_claims": []
+    },
+    "exfil_cloud": {
+      "id": "T1567.002",
+      "name": "Exfiltration Over Web Service: Exfiltration to Cloud Storage",
+      "parent_id": "T1567",
+      "tactic": "Exfiltration",
+      "tactic_id": "TA0010",
+      "aliases": ["exfiltration to cloud storage"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Sends stolen data to a cloud storage/web service (e.g. object storage, paste sites) that blends with normal web traffic."
+      ],
+      "forbidden_claims": []
+    },
+    "remote_system_discovery": {
+      "id": "T1018",
+      "name": "Remote System Discovery",
+      "parent_id": null,
+      "tactic": "Discovery",
+      "tactic_id": "TA0007",
+      "aliases": ["remote system discovery"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Enumerates other hosts on the network (e.g. via ping sweeps, net view, AD queries) to plan lateral movement."
+      ],
+      "forbidden_claims": []
+    },
+    "network_service_discovery": {
+      "id": "T1046",
+      "name": "Network Service Discovery",
+      "parent_id": null,
+      "tactic": "Discovery",
+      "tactic_id": "TA0007",
+      "aliases": ["network service discovery", "port scanning"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Port/service scanning to find reachable services (this is where Nmap fits) — a Discovery activity, not a credential-access one."
+      ],
+      "forbidden_claims": []
+    },
+    "domain_account_discovery": {
+      "id": "T1087.002",
+      "name": "Account Discovery: Domain Account",
+      "parent_id": "T1087",
+      "tactic": "Discovery",
+      "tactic_id": "TA0007",
+      "aliases": ["domain account discovery", "enumerate domain users"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Enumerates domain accounts via LDAP/net/PowerView; this LDAP enumeration is how SPNs for Kerberoasting are discovered."
+      ],
+      "forbidden_claims": []
+    },
+    "domain_groups_discovery": {
+      "id": "T1069.002",
+      "name": "Permission Groups Discovery: Domain Groups",
+      "parent_id": "T1069",
+      "tactic": "Discovery",
+      "tactic_id": "TA0007",
+      "aliases": ["domain groups discovery"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Enumerates domain groups (e.g. Domain Admins membership) to find high-value targets."
+      ],
+      "forbidden_claims": []
+    },
+    "bits_jobs": {
+      "id": "T1197",
+      "name": "BITS Jobs",
+      "parent_id": null,
+      "tactic": "Defense Evasion, Persistence",
+      "tactic_id": "TA0005",
+      "aliases": ["bits jobs", "bitsadmin"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Abuses the Background Intelligent Transfer Service (bitsadmin/PowerShell BITS) to download/execute and persist while blending with normal update traffic."
+      ],
+      "forbidden_claims": []
+    },
+    "ingress_tool_transfer": {
+      "id": "T1105",
+      "name": "Ingress Tool Transfer",
+      "parent_id": null,
+      "tactic": "Command and Control",
+      "tactic_id": "TA0011",
+      "aliases": ["ingress tool transfer", "download payload"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Transfers tools/payloads from external infrastructure into the environment (e.g. certutil -urlcache, PowerShell downloads)."
+      ],
+      "forbidden_claims": []
+    },
+    "uac_bypass": {
+      "id": "T1548.002",
+      "name": "Abuse Elevation Control Mechanism: Bypass User Account Control",
+      "parent_id": "T1548",
+      "tactic": "Privilege Escalation, Defense Evasion",
+      "tactic_id": "TA0004",
+      "aliases": ["uac bypass", "bypass user account control"],
+      "forbidden_ids": ["T1068"],
+      "confused_with": {
+        "T1068": "Exploitation for Privilege Escalation exploits a software vulnerability; a UAC bypass abuses a built-in elevation feature/auto-elevate binary, not a vuln."
+      },
+      "key_facts": [
+        "Elevates from medium to high integrity by abusing auto-elevating binaries/COM, not by exploiting a vulnerability."
+      ],
+      "forbidden_claims": []
+    },
+    "access_token_manipulation": {
+      "id": "T1134",
+      "name": "Access Token Manipulation",
+      "parent_id": null,
+      "tactic": "Defense Evasion, Privilege Escalation",
+      "tactic_id": "TA0005",
+      "aliases": ["access token manipulation", "token impersonation"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Duplicates/impersonates or creates Windows access tokens to run in another security context (e.g. SYSTEM)."
+      ],
+      "forbidden_claims": []
+    },
+    "disable_tools": {
+      "id": "T1562.001",
+      "name": "Impair Defenses: Disable or Modify Tools",
+      "parent_id": "T1562",
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["disable security tools", "impair defenses"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Stops/uninstalls or reconfigures AV/EDR/logging to avoid detection (e.g. stopping the Defender service, adding exclusions)."
+      ],
+      "forbidden_claims": []
+    },
+    "clear_event_logs": {
+      "id": "T1070.001",
+      "name": "Indicator Removal: Clear Windows Event Logs",
+      "parent_id": "T1070",
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["clear event logs", "wevtutil cl"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Clears Windows event logs (wevtutil cl / Clear-EventLog) to destroy evidence; generates Event ID 1102 (audit log cleared)."
+      ],
+      "forbidden_claims": []
+    },
+    "file_deletion": {
+      "id": "T1070.004",
+      "name": "Indicator Removal: File Deletion",
+      "parent_id": "T1070",
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["file deletion", "anti-forensics delete"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Deletes tools/artifacts (e.g. sdelete, del) to remove evidence of activity."
+      ],
+      "forbidden_claims": []
+    },
+    "masquerading": {
+      "id": "T1036.005",
+      "name": "Masquerading: Match Legitimate Name or Location",
+      "parent_id": "T1036",
+      "tactic": "Defense Evasion",
+      "tactic_id": "TA0005",
+      "aliases": ["masquerading", "legitimate name"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Names/places malware to look legitimate (e.g. 'svchost.exe' in a non-System32 path) to blend in."
+      ],
+      "forbidden_claims": []
+    },
+    "user_execution_file": {
+      "id": "T1204.002",
+      "name": "User Execution: Malicious File",
+      "parent_id": "T1204",
+      "tactic": "Execution",
+      "tactic_id": "TA0002",
+      "aliases": ["user execution malicious file", "open malicious attachment"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Relies on a user opening a malicious file (macro doc, ISO, LNK); pairs with Spearphishing Attachment (T1566.001)."
+      ],
+      "forbidden_claims": []
+    },
+    "spearphishing_link": {
+      "id": "T1566.002",
+      "name": "Phishing: Spearphishing Link",
+      "parent_id": "T1566",
+      "tactic": "Initial Access",
+      "tactic_id": "TA0001",
+      "aliases": ["spearphishing link"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Initial access via a link in a message (vs. an attachment, T1566.001)."
+      ],
+      "forbidden_claims": []
+    },
+    "exfil_over_c2": {
+      "id": "T1041",
+      "name": "Exfiltration Over C2 Channel",
+      "parent_id": null,
+      "tactic": "Exfiltration",
+      "tactic_id": "TA0010",
+      "aliases": ["exfiltration over c2 channel"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Steals data back over the same channel used for command and control, rather than a separate protocol."
+      ],
+      "forbidden_claims": []
+    },
+    "remote_access_software": {
+      "id": "T1219",
+      "name": "Remote Access Software",
+      "parent_id": null,
+      "tactic": "Command and Control",
+      "tactic_id": "TA0011",
+      "aliases": ["remote access software", "anydesk", "teamviewer abuse"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Abuses legitimate remote-access tools (AnyDesk, TeamViewer, ScreenConnect) for C2/hands-on-keyboard access, blending with IT usage."
+      ],
+      "forbidden_claims": []
+    },
+    "active_scanning": {
+      "id": "T1595",
+      "name": "Active Scanning",
+      "parent_id": null,
+      "tactic": "Reconnaissance",
+      "tactic_id": "TA0043",
+      "aliases": ["active scanning"],
+      "forbidden_ids": [],
+      "confused_with": {},
+      "key_facts": [
+        "Pre-compromise reconnaissance that probes target infrastructure (scanning IP blocks, vuln scanning) from outside."
+      ],
+      "forbidden_claims": []
     }
   },
   "obsolete_ids": {
