@@ -125,14 +125,21 @@ Eval harness ──┴───────────────────�
 
 ## 6. P2 items (important hardening)
 
-- **P2a Observability:** request latency + auth/authz-failure structured events; document. `TODO`
-- **P2b Operational smoke tests:** executable suite (install/startup/health/authn/authz/
-  failure modes) runnable locally + in CI without real credentials. `TODO`
-- **P2c CLI auth:** allow the CLI to send a bearer token to a protected API (`--token`/env).
-  `TODO`
-- **P2d Rollback drill test:** registry rollback covered by a test. `TODO`
-- **P2e Admin API for model lifecycle:** expose registry mutation via authz'd endpoints
-  (also satisfies P1b surface). `TODO`
+- **P2a Observability:** request latency + auth/authz-failure structured events; document.
+  `DONE` (middleware logs method/path/status/latency_ms; authn/authz failures logged with
+  request id, never tokens; docs/operations.md).
+- **P2b Operational smoke tests:** executable suite (startup/health/authn/authz/validation/
+  failure) runnable live (`scripts/smoke_test.py`) + in CI in-process
+  (`tests/test_operational_smoke.py`, open + auth modes). `DONE` (live run: 13/13 PASS).
+- **P2c CLI auth:** N/A for the current architecture — the CLI is a local operator tool
+  that talks to the model runtime via the shared engine (an approved path in the target
+  architecture: "CLI → API **or shared application interface**"), so it needs no Auth0.
+  Remote-API CLI mode is `DEFERRED`.
+- **P2d Rollback drill test:** registry rollback is covered
+  (`tests/test_inference_registry.py::test_rollback_from_production`) + admin promotion
+  flow test. `DONE`.
+- **P2e Admin API for model lifecycle:** authz'd `/v1/admin/models/*` endpoints. `DONE`
+  (with P1b).
 
 ## 7. P3 improvements
 

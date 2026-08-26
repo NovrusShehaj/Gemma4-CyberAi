@@ -64,6 +64,20 @@ audit trail in git indefinitely.
 4. **Recover** — restart the affected container; confirm `/v1/ready`.
 5. **Record** — note cause + fix in `docs/decisions.md`.
 
+## Operational smoke test
+
+`scripts/smoke_test.py` validates a running deployment end to end: liveness,
+readiness, security headers, model listing, input validation, the generate path,
+and — with `--expect-auth` — that auth is enforced.
+
+```bash
+python scripts/smoke_test.py --base-url http://localhost:8000
+python scripts/smoke_test.py --base-url https://api.example.com --token "$TOKEN" --expect-auth
+```
+Exit 0 = all required checks passed. Run it after every deploy and after a
+rollback. The same checks run in CI in-process (`tests/test_operational_smoke.py`,
+open + auth-enforced modes) so regressions are caught without a live server.
+
 ## Rollback drill
 
 Rollback is a registry promotion (model) or an image-tag redeploy (code). Test it
