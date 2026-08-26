@@ -30,6 +30,10 @@ secrets.yml
 
 # ---- Models & large artifacts (kept out of git) ----
 models/
+# ...but the model registry is metadata/audit-trail (promotions, provenance), not
+# weights — track it.
+!data/models/
+!data/models/registry.json
 *.gguf
 *.safetensors
 *.bin

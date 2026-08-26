@@ -1,0 +1,38 @@
+{
+  "schema": "gemma-cyber/model-registry@1",
+  "updated_at": "2026-08-26T14:11:52.268728+00:00",
+  "models": [
+    {
+      "version": "gemma3:4b",
+      "stage": "evaluated",
+      "ollama_tag": "gemma3:4b",
+      "base_model": "gemma3:4b",
+      "dataset_version": null,
+      "git_commit": null,
+      "gguf_sha256": null,
+      "experiment": null,
+      "passed_eval": false,
+      "eval_ref": "experiments/baseline_gemma3-4b_v2/scorecard.md",
+      "notes": "Frozen base/reference (the anchor to beat). Baseline pass_rate 0.84.",
+      "created_at": "2026-08-26T14:11:52.267915+00:00",
+      "updated_at": "2026-08-26T14:11:52.268215+00:00",
+      "history": []
+    },
+    {
+      "version": "gemma3-cyber:v0.2",
+      "stage": "experimental",
+      "ollama_tag": "gemma3-cyber:v0.2",
+      "base_model": "gemma3:4b",
+      "dataset_version": "sft_v0.2",
+      "git_commit": "6e5824cece894a26d2b470ace98a52641cf38cfd",
+      "gguf_sha256": null,
+      "experiment": "exp-002-gemma3-cyber-v0.2",
+      "passed_eval": false,
+      "eval_ref": null,
+      "notes": "exp-002 candidate. Improvement UNPROVEN (trained once on Colab, artifacts lost, no evaluation run). Stays experimental until a scorecard clears docs/experiments/exp-002.md success criteria.",
+      "created_at": "2026-08-26T14:11:52.268699+00:00",
+      "updated_at": "2026-08-26T14:11:52.268703+00:00",
+      "history": []
+    }
+  ]
+}
