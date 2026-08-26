@@ -94,6 +94,18 @@ class Settings:
     # Observability.
     log_level: str = "INFO"
 
+    # HTTP API / web service (Phase 7/8/9). All optional; the service runs with
+    # sane, safe-by-default values and no secrets in the repo.
+    #   api_token: if non-empty, /v1/* requires `Authorization: Bearer <token>`.
+    #   rate_limit_per_min: per-client generate cap; 0 disables (dev default).
+    #   cors_origins: comma-separated allowlist; empty = same-origin only.
+    api_token: str = ""
+    rate_limit_per_min: int = 0
+    cors_origins: tuple[str, ...] = ()
+
+    def auth_required(self) -> bool:
+        return bool(self.api_token)
+
     def redacted(self) -> dict[str, Any]:
         """A dict safe to log/return: no secrets live here, but keep this the
         single chokepoint so future sensitive fields are excluded by default."""
@@ -131,6 +143,11 @@ def load_settings(**overrides: Any) -> Settings:
         retry_backoff=_env_float("RETRY_BACKOFF", 0.5),
         registry_path=Path(_env("REGISTRY_PATH", str(DEFAULT_REGISTRY_PATH)) or DEFAULT_REGISTRY_PATH),
         log_level=(_env("LOG_LEVEL", "INFO") or "INFO").upper(),
+        api_token=_env("API_TOKEN", "") or "",
+        rate_limit_per_min=_env_int("RATE_LIMIT_PER_MIN", 0),
+        cors_origins=tuple(
+            o.strip() for o in (_env("CORS_ORIGINS", "") or "").split(",") if o.strip()
+        ),
     )
     if overrides:
         merged = {**base.__dict__, **overrides}

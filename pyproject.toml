@@ -18,13 +18,23 @@ dependencies = [
 
 [project.scripts]
 gemma-cyber = "gemma_cyber.cli.main:main"
+gemma-cyber-serve = "gemma_cyber.api.server:run"
 
-[project.optional-dependencies]
+# The HTTP API / web service (Phase 7/8). Kept out of core deps so the CLI and
+# eval harness install with zero web dependencies.
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+]
+
+# dev includes the api stack + httpx so CI exercises the API via TestClient.
 dev = [
     "pytest>=8.0",
     "ruff>=0.5.0",
     "mypy>=1.10.0",
     "types-pyyaml>=6.0.12",
+    "fastapi>=0.110",
+    "httpx>=0.27",
 ]
 
 [build-system]
