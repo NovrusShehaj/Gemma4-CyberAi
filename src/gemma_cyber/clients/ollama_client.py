@@ -10,6 +10,8 @@ This client is for INFERENCE ONLY. Training never goes through Ollama.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -127,3 +129,57 @@ class OllamaClient:
             system=system,
             options=options,
         )
+
+    def stream_generate(
+        self,
+        prompt: str,
+        system: str | None = None,
+        temperature: float = 0.0,
+        seed: int = 0,
+        num_predict: int | None = None,
+        think: bool | None = None,
+    ) -> Iterator[str]:
+        """Yield response text incrementally as Ollama produces it.
+
+        Streaming is for interactive surfaces (CLI/web), NOT for evaluation —
+        evaluation stays on the deterministic, non-streamed :meth:`generate` so a
+        scorecard reflects one complete response. Same deterministic defaults
+        apply. Each yielded string is the next token chunk; the generator ends
+        when Ollama sends ``done: true``.
+        """
+        options: dict[str, Any] = {"temperature": temperature, "seed": seed}
+        if num_predict is not None:
+            options["num_predict"] = num_predict
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": True,
+            "options": options,
+        }
+        if system is not None:
+            payload["system"] = system
+        if think is not None:
+            payload["think"] = think
+
+        try:
+            resp = requests.post(
+                f"{self.host}/api/generate",
+                json=payload,
+                timeout=self.timeout,
+                stream=True,
+            )
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                chunk = json.loads(line)
+                piece = chunk.get("response", "")
+                if piece:
+                    yield piece
+                if chunk.get("done"):
+                    break
+        except requests.RequestException as exc:
+            raise OllamaError(
+                f"Streaming failed against {self.host} (model={self.model}): {exc}"
+            ) from exc
