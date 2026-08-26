@@ -30,14 +30,23 @@ Put a TLS-terminating reverse proxy (Caddy/nginx/Traefik) in front of `api`, and
 enable the built-in controls via environment:
 
 ```bash
-export GEMMA_CYBER_API_TOKEN="$(openssl rand -hex 32)"   # require Bearer auth
-export GEMMA_CYBER_RATE_LIMIT_PER_MIN=60                  # per-client cap
+# Auth0 JWT (recommended for real identity + authorization) — see docs/auth.md:
+export GEMMA_CYBER_AUTH_DOMAIN="your-tenant.auth0.com"
+export GEMMA_CYBER_AUTH_AUDIENCE="https://api.gemma-cyber"
+# ...or a static dev-grade token (no per-user identity, cannot administer models):
+# export GEMMA_CYBER_API_TOKEN="$(openssl rand -hex 32)"
+export GEMMA_CYBER_ENV=prod                               # fail closed if no auth set
+export GEMMA_CYBER_RATE_LIMIT_PER_MIN=60                  # per-identity cap
 export GEMMA_CYBER_CORS_ORIGINS="https://app.example.com" # if a separate frontend
 ```
 
+With `GEMMA_CYBER_ENV=prod` the service **refuses to start** unless authentication
+is configured — an accidental open public API is impossible.
+
 Checklist before public exposure:
 - [ ] HTTPS only (proxy redirects 80→443, HSTS).
-- [ ] `GEMMA_CYBER_API_TOKEN` set (or a real auth gateway in front).
+- [ ] Auth0 JWT configured (`GEMMA_CYBER_AUTH_DOMAIN` + `GEMMA_CYBER_AUTH_AUDIENCE`),
+      or at minimum a static token; `admin:models` permission assigned to admins only.
 - [ ] Rate limit set (the in-process limiter is single-instance; use the proxy's
       limiter if you run more than one `api` replica).
 - [ ] Ollama never published to the host/internet.

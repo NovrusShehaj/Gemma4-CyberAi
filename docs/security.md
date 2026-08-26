@@ -33,8 +33,11 @@ controls listed in "Future tool/agent controls" below — not before.
 | Control | Status | Notes |
 |---|---|---|
 | Input validation + size bounds | ✅ | pydantic; prompt ≤ 24k chars → 422 |
-| Bearer-token auth | ✅ (opt-in) | `GEMMA_CYBER_API_TOKEN`; constant-time compare |
-| Rate limiting | ✅ (opt-in) | in-process fixed window; per-token when authed |
+| Authentication (Auth0 JWT) | ✅ | RS256 + JWKS rotation, iss/aud/exp/claims; see `docs/auth.md` |
+| Authorization (server-side) | ✅ | scopes from signed token; admin routes require `admin:models` |
+| Prod fail-closed | ✅ | `GEMMA_CYBER_ENV=prod` with no auth configured refuses to start |
+| Static dev token (fallback) | ✅ (opt-in) | `GEMMA_CYBER_API_TOKEN`; constant-time; never admin |
+| Rate limiting | ✅ (opt-in) | in-process fixed window; per-identity when authed |
 | Security headers + CSP | ✅ | CSP, `X-Frame-Options: DENY`, nosniff, referrer, COOP |
 | CORS allowlist | ✅ | empty = same-origin only |
 | Structured errors (no stack leaks) | ✅ | typed → 401/422/429/503/504 |

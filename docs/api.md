@@ -35,7 +35,14 @@ Inherits all `GEMMA_CYBER_*` inference settings (see `docs/cli.md`) plus:
 | GET | `/health` | no | Liveness (process up; never touches the model) |
 | GET | `/v1/ready` | no | Readiness (runtime reachable + model present); 503 when not ready |
 | GET | `/v1/models` | no | Registry listing + current production version |
-| POST | `/v1/generate` | if token set | One completion, or SSE stream when `stream=true` |
+| POST | `/v1/generate` | authenticated | One completion, or SSE stream when `stream=true` |
+| POST | `/v1/admin/models/register` | `admin:models` | Register a model version |
+| POST | `/v1/admin/models/{version}/mark-evaluated` | `admin:models` | Record an eval outcome (gate input) |
+| POST | `/v1/admin/models/{version}/promote` | `admin:models` | Promote a version (gated lifecycle) |
+
+Authentication is Auth0 JWT (or a static dev token); authorization is enforced
+server-side from the signed token. See **`docs/auth.md`** for modes, validation,
+scopes, and the Auth0 dashboard setup.
 
 ### `POST /v1/generate`
 

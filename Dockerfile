@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir ".[api]"
 
 # The registry is optional metadata; mount or bake it and point the app at it.
+# NOTE: ENV=prod is a SAFE default — with it the app fail-closes (refuses to start)
+# unless auth is configured (GEMMA_CYBER_AUTH_DOMAIN+AUDIENCE, or GEMMA_CYBER_API_TOKEN).
+# docker-compose overrides ENV=staging for a startable local stack. See docs/auth.md.
 ENV GEMMA_CYBER_API_HOST=0.0.0.0 \
     GEMMA_CYBER_API_PORT=8000 \
     GEMMA_CYBER_OLLAMA_HOST=http://ollama:11434 \

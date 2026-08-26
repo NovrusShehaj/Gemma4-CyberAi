@@ -33,8 +33,15 @@ services:
     environment:
       GEMMA_CYBER_OLLAMA_HOST: http://ollama:11434
       GEMMA_CYBER_MODEL: gemma3:4b
-      GEMMA_CYBER_ENV: prod
-      # Uncomment to require auth / rate-limit when exposing beyond localhost:
+      # `staging` starts open for local evaluation. For a real/public deployment set
+      # GEMMA_CYBER_ENV=prod AND configure auth below — in prod the service REFUSES
+      # to start without authentication (fail-closed). See docs/auth.md.
+      GEMMA_CYBER_ENV: staging
+      # --- Production auth (recommended: Auth0 JWT) ---
+      # GEMMA_CYBER_ENV: prod
+      # GEMMA_CYBER_AUTH_DOMAIN: ${GEMMA_CYBER_AUTH_DOMAIN}
+      # GEMMA_CYBER_AUTH_AUDIENCE: ${GEMMA_CYBER_AUTH_AUDIENCE}
+      # ...or a static dev-grade token, and a rate limit when exposed publicly:
       # GEMMA_CYBER_API_TOKEN: ${GEMMA_CYBER_API_TOKEN}
       # GEMMA_CYBER_RATE_LIMIT_PER_MIN: "60"
       GEMMA_CYBER_REGISTRY_PATH: /app/registry/registry.json
