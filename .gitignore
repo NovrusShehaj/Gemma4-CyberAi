@@ -8,6 +8,7 @@ dist/
 .venv/
 venv/
 env/
+agents/
 .python-version
 
 # ---- Environments & secrets (NEVER commit) ----

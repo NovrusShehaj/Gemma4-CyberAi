@@ -1,0 +1,47 @@
+# Reproducible ML stack for exp-002 QLoRA training + GGUF export.
+# Used by scripts/train_qlora.py and notebooks/colab_qlora_training.ipynb.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# The first exp-002 Colab run failed because Step 1 installed the ML stack
+# UNPINNED. Colab's preinstalled `torchao` (0.10.0) was older than the
+# `> 0.16.0` the resolved `peft` required, and `PeftModel.from_pretrained`
+# raised `ImportError` at merge time. Unpinned installs also mean no two runs
+# are guaranteed to use the same versions. This file pins the stack.
+#
+# HOW TO USE
+# ----------
+#   pip install -r configs/training/requirements-train.txt
+# The single most important constraint is `torchao>=0.16.0` (the exact break we
+# hit). The rest are the versions the pipeline is written against.
+#
+# AUTHORITATIVE LOCK
+# ------------------
+# These are a KNOWN-GOOD baseline, not hardware-verified for every Colab image.
+# The notebook's Step 1 writes `pip freeze` to the run manifest
+# (`<artifacts>/run_manifest/pip_freeze.txt`) on every successful run. After a
+# green run, copy those exact resolved versions here (replace the ranges with
+# `==` pins) so the run becomes bit-for-bit reproducible. Treat the captured
+# freeze — not this hand-maintained file — as ground truth.
+#
+# Python: Colab currently ships 3.13; local training VMs should use 3.11-3.13.
+
+# Core training stack. Gemma-3 support requires transformers >= 4.50.
+torch>=2.4,<2.9
+transformers>=4.50,<5
+peft>=0.13,<0.18
+trl>=0.12,<0.24
+bitsandbytes>=0.44
+accelerate>=0.34
+datasets>=2.20
+
+# The exact package whose version skew broke the first run. Install it >=0.16.0
+# from the start so peft's merge-time check passes on a fresh Colab image.
+torchao>=0.16.0
+
+# Model download + auth (gated google/gemma-3-4b-it) and GGUF export helpers.
+huggingface_hub>=0.24
+pyyaml>=6.0
+sentencepiece>=0.2
+protobuf>=4.25
+gguf>=0.10           # read/verify exported GGUF metadata (scripts/verify_gguf_export.py)
