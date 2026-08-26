@@ -20,6 +20,7 @@ dependencies = [
 gemma-cyber = "gemma_cyber.cli.main:main"
 gemma-cyber-serve = "gemma_cyber.api.server:run"
 
+[project.optional-dependencies]
 # The HTTP API / web service (Phase 7/8). Kept out of core deps so the CLI and
 # eval harness install with zero web dependencies.
 api = [

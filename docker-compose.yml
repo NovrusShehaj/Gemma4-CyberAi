@@ -1,0 +1,49 @@
+# Local/production-like stack: the Gemma-Cyber API + an Ollama model runtime.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose exec ollama ollama pull gemma3:4b     # one-time model pull
+#   open http://localhost:8000/
+#
+# This is a SINGLE-HOST deployment (the documented target). For public exposure,
+# put a TLS-terminating reverse proxy in front of the `api` service and set
+# GEMMA_CYBER_API_TOKEN + GEMMA_CYBER_RATE_LIMIT_PER_MIN (see docs/deployment.md).
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama   # persist pulled models across restarts
+    # Not published to the host: only the api service reaches it over the
+    # compose network, so the raw model runtime is never exposed.
+    expose:
+      - "11434"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      GEMMA_CYBER_OLLAMA_HOST: http://ollama:11434
+      GEMMA_CYBER_MODEL: gemma3:4b
+      GEMMA_CYBER_ENV: prod
+      # Uncomment to require auth / rate-limit when exposing beyond localhost:
+      # GEMMA_CYBER_API_TOKEN: ${GEMMA_CYBER_API_TOKEN}
+      # GEMMA_CYBER_RATE_LIMIT_PER_MIN: "60"
+      GEMMA_CYBER_REGISTRY_PATH: /app/registry/registry.json
+    volumes:
+      # Mount the registry so promotions persist and are auditable on the host.
+      - ./data/models:/app/registry:ro
+    ports:
+      - "127.0.0.1:8000:8000"   # bind to localhost; front with a proxy for public use
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
