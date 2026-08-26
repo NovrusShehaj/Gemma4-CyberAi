@@ -63,6 +63,24 @@ class HealthResponse(BaseModel):
     detail: str = ""
 
 
+class RegisterModelRequest(BaseModel):
+    """Admin: register a new model version (requires `admin:models`)."""
+
+    version: str = Field(..., min_length=1, max_length=200)
+    base_model: str = Field(default="gemma3:4b", max_length=200)
+    dataset_version: str | None = Field(default=None, max_length=200)
+    experiment: str | None = Field(default=None, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
+    overwrite: bool = False
+
+
+class PromoteRequest(BaseModel):
+    """Admin: promote a version to a lifecycle stage (requires `admin:models`)."""
+
+    to: str = Field(..., description="Target stage.")
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str = ""
