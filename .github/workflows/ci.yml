@@ -39,3 +39,38 @@ jobs:
 
       - name: Run tests
         run: uv run --no-sync pytest
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks scans full history
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install project (with dev deps)
+        run: |
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+
+      # Python static security analysis. -ll = medium severity and up, so the
+      # intentional `assert` invariants (B101, low) don't fail the gate. The
+      # baseline is documented in docs/security.md — do not blanket-suppress.
+      - name: Bandit (static security)
+        run: uv run --no-sync bandit -r src -ll
+
+      # Dependency vulnerability audit of the installed environment. Our own
+      # unpublished package is skipped (not on PyPI); real deps must be clean.
+      - name: pip-audit (dependency CVEs)
+        run: uv run --no-sync pip-audit --progress-spinner off --skip-editable
+
+      # Secret scanning across the full git history. gitleaks-action is free for
+      # personal accounts; org accounts need GITLEAKS_LICENSE (see docs/security.md).
+      - name: Gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

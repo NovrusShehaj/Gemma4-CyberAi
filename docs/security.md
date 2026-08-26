@@ -60,10 +60,32 @@ review and the boundary controls below.
 
 ## Dependency & supply-chain
 
-- CI runs ruff + mypy + the test suite on every push/PR.
-- **Recommended additions (not yet wired):** `pip-audit` for CVEs and image
-  scanning (Trivy/grype) in CI before release. Run the `security-review` skill on
-  each branch touching the API.
+CI runs a dedicated **`security`** job on every push/PR (`.github/workflows/ci.yml`):
+
+| Scan | Tool | Gate |
+|---|---|---|
+| Python static analysis | `bandit -r src -ll` (medium+) | fail on medium/high |
+| Dependency CVEs | `pip-audit --skip-editable` | fail on any known vuln |
+| Secret scanning (full history) | `gitleaks-action@v2` | fail on any finding |
+
+The lint job also runs ruff + mypy + the test suite (incl. the auth negative tests,
+which are the primary auth-control validation).
+
+### Security baseline (2026-08-26)
+
+- **bandit (medium+):** 0 findings. (3 low-severity `B101` "assert used" in eval
+  scorers are intentional invariants; not run at the CI gate's `-ll` level.)
+- **pip-audit:** no known vulnerabilities in dependencies.
+- **gitleaks:** no committed secrets (the auth tests generate an RS256 keypair at
+  runtime; none is stored).
+
+**Policy:** do not blanket-suppress findings to make CI green. A justified exception
+must be documented here with the finding id, reason, and review date. Image scanning
+(Trivy/grype) is recommended before publishing a container image and is not yet wired.
+
+**gitleaks note:** the action is free for personal GitHub accounts. Organization
+accounts require a `GITLEAKS_LICENSE` secret; set it or swap for `trufflehog` if the
+repo moves under an org.
 
 ## Logging & privacy
 

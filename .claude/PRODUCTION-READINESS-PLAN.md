@@ -121,7 +121,7 @@ Eval harness ──┴───────────────────�
   security rules; findings actionable; baseline documented.
 - **Files:** `.github/workflows/ci.yml`, `pyproject.toml` (ruff `S`), `docs/security.md`.
 - **Acceptance:** CI job runs the scans; documented baseline + justified exceptions.
-- **Status:** TODO
+- **Status:** DONE (CI `security` job: bandit + pip-audit + gitleaks; baseline in docs/security.md)
 
 ## 6. P2 items (important hardening)
 
