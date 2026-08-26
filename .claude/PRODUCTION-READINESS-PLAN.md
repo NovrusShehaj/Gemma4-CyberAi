@@ -212,6 +212,29 @@ Model rollback = registry promotion (tested). Code rollback = image tag redeploy
 Update `docs/security.md`, `docs/deployment.md`, `docs/operations.md`, `docs/api.md`,
 add `docs/auth.md`; keep this plan synced.
 
+## 19a. Reassessment (2026-08-26, after this pass)
+
+**Application production status: ORANGE → GREEN-conditional.** All 4 P1 blockers are
+implemented, tested, and (where possible) operationally validated:
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| Authentication (Auth0 JWT) | ✅ local; tenant config external | `tests/test_api_auth.py` (16), `docs/auth.md` |
+| Authorization (server-side) | ✅ | `admin:models`-gated endpoints; 403 tests |
+| Prod fail-closed | ✅ | verified: prod w/o auth refuses to start |
+| API production-safe | ✅ | validation, bounds, timeouts, typed errors, rate limit |
+| Security scanning in CI | ✅ | bandit 0 / pip-audit clean / gitleaks; `docs/security.md` |
+| Observability | ✅ (logs) | latency + authn/authz failure events; metrics export deferred |
+| Operational smoke tests | ✅ | live 13/13 PASS; CI in-process (open + auth) |
+| Deployment hardening | ✅ | non-root image, compose isolation, fail-closed, health/ready |
+
+**Conditions remaining before an unqualified GREEN (external, not code):**
+1. Provision an Auth0 tenant + set env (steps in `docs/auth.md`); run the live smoke
+   test with `--expect-auth` against it.
+2. Execute exp-002 training + evaluation on a GPU and promote a model that clears its
+   gate (AIa) — the *model* remains UNPROVEN; the *application* does not depend on it.
+3. (Recommended) image scanning (Trivy) before publishing a container; managed TLS proxy.
+
 ## 19. Production go/no-go criteria
 GREEN requires: Auth0 authn+authz enforced server-side and tested (✔ local, tenant config
 documented); prod fail-closed; security scanning in CI with a reviewed baseline;
