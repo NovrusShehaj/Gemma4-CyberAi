@@ -22,8 +22,8 @@ engine/registry are injected (via args or app.state) so tests run without Ollama
 
 import json
 import logging
+import os
 import time
-import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -49,8 +49,10 @@ from gemma_cyber.api.schemas import (
     RegisterModelRequest,
 )
 from gemma_cyber.api.security import (
-    SECURITY_HEADERS,
+    Capacity,
     RateLimiter,
+    safe_request_id,
+    security_headers,
     token_matches,
 )
 from gemma_cyber.inference import InferenceEngine, ModelRegistry, Settings, load_settings
@@ -58,8 +60,10 @@ from gemma_cyber.inference.errors import (
     InferenceError,
     InferenceTimeoutError,
     ModelUnavailableError,
+    RegistryError,
     ServiceUnavailableError,
 )
+from gemma_cyber.inference.registry import RegistryReadOnlyError
 
 logger = logging.getLogger("gemma_cyber.api")
 
@@ -90,16 +94,22 @@ def create_app(
     In ``GEMMA_CYBER_ENV=prod`` at least one auth mode MUST be configured or the
     app refuses to start (fail closed — no accidental open prod).
     """
+    from contextlib import asynccontextmanager
+
     from fastapi import Depends, FastAPI, Header, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
-    settings = settings or load_settings()
+    settings = (settings or load_settings()).validate()
     auth_settings = auth_settings or AuthSettings.from_env()
     if engine is None:
         engine = InferenceEngine.from_settings(settings)
     if registry is None and settings.registry_path and settings.registry_path.exists():
-        registry = ModelRegistry(settings.registry_path)
+        # Hosted deployments open the registry read-only (GitOps): runtime writes
+        # are refused at the persistence layer, not just skipped at the route.
+        registry = ModelRegistry(
+            settings.registry_path, read_only=not settings.registry_writable
+        )
 
     jwt_mode = auth_settings.enabled
     static_mode = bool(settings.api_token)
@@ -121,17 +131,58 @@ def create_app(
     if jwt_mode and verifier is None:
         verifier = TokenVerifier(auth_settings)
 
+    # Browser SPA (Auth0 Authorization Code + PKCE) configuration. The client id is
+    # PUBLIC config (never a secret); the domain/audience mirror the server's JWT
+    # settings so the token the browser gets is exactly what the API validates.
+    web_client_id = os.environ.get("GEMMA_CYBER_WEB_AUTH0_CLIENT_ID", "").strip()
+    web_auth_enabled = jwt_mode and bool(web_client_id)
+    if jwt_mode and settings.hosted and not web_client_id:
+        logger.warning(
+            "JWT auth is enabled but GEMMA_CYBER_WEB_AUTH0_CLIENT_ID is unset; the "
+            "shipped browser UI cannot sign in and every /v1/generate will 401. Set "
+            "the SPA client id (public) to enable the web login flow."
+        )
+    # Only widen CSP connect-src/form-action to the Auth0 origin when the SPA needs it.
+    resp_headers = security_headers(auth_settings.domain if web_auth_enabled else "")
+
     limiter = RateLimiter(settings.rate_limit_per_min)
+    capacity = Capacity(settings.max_concurrent_generations)
+
+    # In hosted mode hide interactive API docs by default (reduce discovery surface).
+    docs_url = None if settings.hosted else "/docs"
+    redoc_url = None if settings.hosted else "/redoc"
+    openapi_url = None if settings.hosted else "/openapi.json"
+
+    @asynccontextmanager
+    async def _lifespan(_app: Any) -> Any:
+        # Log resolved posture at startup (secret-free) and shutdown outcome so an
+        # operator can confirm the deployment mode from logs alone.
+        logger.info(
+            "api ready",
+            extra={"route": settings.environment, "model": settings.model,
+                   "auth_result": app.state.auth_mode},
+        )
+        try:
+            yield
+        finally:
+            # Uvicorn stops accepting new connections and drains in-flight ones on
+            # signal; we record the outcome and how much capacity was still in use.
+            logger.info("api shutdown", extra={"model": str(capacity.active)})
 
     app = FastAPI(
         title="Gemma-Cyber Inference API",
         version=API_VERSION,
         description="Defensive cybersecurity assistant. Authorized use only.",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
+        lifespan=_lifespan,
     )
     app.state.settings = settings
     app.state.engine = engine
     app.state.registry = registry
     app.state.limiter = limiter
+    app.state.capacity = capacity
     app.state.auth_settings = auth_settings
     app.state.verifier = verifier
     app.state.auth_mode = "jwt" if jwt_mode else ("static" if static_mode else "open")
@@ -148,7 +199,7 @@ def create_app(
 
     @app.middleware("http")
     async def _request_context(request: Request, call_next):
-        rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+        rid = safe_request_id(request.headers.get("X-Request-ID"))
         request.state.request_id = rid
         started = time.monotonic()
         status = 500
@@ -161,7 +212,7 @@ def create_app(
                 status_code=500,
                 content=ErrorResponse.of("internal_error", request_id=rid),
             )
-        for k, v in SECURITY_HEADERS.items():
+        for k, v in resp_headers.items():
             response.headers.setdefault(k, v)
         response.headers["X-Request-ID"] = rid
         # Structured access log: no token/prompt content, just operational signal.
@@ -268,17 +319,49 @@ def create_app(
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def index() -> Any:
         if _WEB_INDEX.exists():
-            return HTMLResponse(_WEB_INDEX.read_text())
+            # HTML carries auth-state UI, so it must never be cached by shared caches.
+            return HTMLResponse(_WEB_INDEX.read_text(),
+                                headers={"Cache-Control": "no-store"})
         return HTMLResponse("<h1>Gemma-Cyber</h1><p>Web UI asset missing.</p>")
+
+    def _asset(name: str, media_type: str) -> Any:
+        from fastapi.responses import Response
+
+        path = _WEB_INDEX.parent / name
+        if not path.exists():
+            return Response("", media_type=media_type, status_code=404)
+        # Not content-hashed, so revalidate rather than cache immutably.
+        return Response(path.read_text(), media_type=media_type,
+                        headers={"Cache-Control": "no-cache"})
 
     @app.get("/app.js", include_in_schema=False)
     async def app_js() -> Any:
-        from fastapi.responses import Response
+        return _asset("app.js", "application/javascript")
 
-        js_path = _WEB_INDEX.parent / "app.js"
-        if not js_path.exists():
-            return Response("// missing", media_type="application/javascript")
-        return Response(js_path.read_text(), media_type="application/javascript")
+    @app.get("/styles.css", include_in_schema=False)
+    async def styles_css() -> Any:
+        return _asset("styles.css", "text/css")
+
+    @app.get("/config.json", include_in_schema=False)
+    async def web_config() -> Any:
+        """Public bootstrap config for the browser SPA. No secrets — the SPA client
+        id is public; domain/audience mirror the API's JWT validation settings."""
+        from fastapi.responses import JSONResponse as _JSON
+
+        return _JSON(
+            {
+                "env": settings.environment,
+                "hosted": settings.hosted,
+                "model": settings.model,
+                "auth": {
+                    "enabled": web_auth_enabled,
+                    "domain": auth_settings.domain if web_auth_enabled else "",
+                    "clientId": web_client_id if web_auth_enabled else "",
+                    "audience": auth_settings.audience if web_auth_enabled else "",
+                },
+            },
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -310,9 +393,26 @@ def create_app(
         )
 
     def _resolve_engine(model: str | None) -> InferenceEngine:
-        """Per-request engine for a requested model alias, else the default."""
+        """Per-request engine for a requested model, honoring the override policy.
+
+        When ``allow_client_overrides`` is off (the hosted default), a client may
+        only select a model that the registry knows — a registered version or a
+        stage alias like ``production``. An arbitrary raw Ollama tag is rejected so
+        a caller cannot pull an unreviewed model into the serving path. When the
+        policy is on (self-host/expert mode), any tag is accepted as before.
+        """
         if not model or model == engine.model:
             return engine
+        if not settings.allow_client_overrides:
+            known_alias = model in ("production", "candidate", "evaluated", "experimental")
+            known_version = registry is not None and model in {
+                r.version for r in registry.list()
+            }
+            if not (known_alias or known_version):
+                raise InferenceError(
+                    f"model {model!r} is not a released model; "
+                    "select a registered version or stage alias"
+                )
         return InferenceEngine.from_settings(settings, model=model)
 
     @app.post(
@@ -323,6 +423,8 @@ def create_app(
         dependencies=[Depends(require_authenticated), Depends(enforce_rate_limit)],
     )
     async def generate(req: GenerateRequest, request: Request) -> Any:
+        from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
+
         rid = request.state.request_id
         try:
             eng = _resolve_engine(req.model)
@@ -331,7 +433,10 @@ def create_app(
                                 content=ErrorResponse.of("bad_model", str(exc), rid))
 
         gen_kwargs: dict[str, Any] = {"request_id": rid}
-        if req.system is not None:
+        # Product policy: unless client overrides are explicitly enabled, the
+        # server owns the safety/system prompt — a client-supplied `system` is
+        # dropped (never silently swaps the production prompt).
+        if req.system is not None and settings.allow_client_overrides:
             gen_kwargs["system"] = req.system
         if req.temperature is not None:
             gen_kwargs["temperature"] = req.temperature
@@ -339,6 +444,18 @@ def create_app(
             gen_kwargs["seed"] = req.seed
         if req.num_predict is not None:
             gen_kwargs["num_predict"] = req.num_predict
+
+        # Admission control: bound concurrent generations; reject deterministically
+        # when saturated rather than queueing and starving the single Ollama host.
+        if not capacity.acquire():
+            logger.warning("generate rejected: at capacity", extra={"request_id": rid})
+            return JSONResponse(
+                status_code=503,
+                content=ErrorResponse.of(
+                    "at_capacity", "server is at generation capacity; retry shortly", rid
+                ),
+                headers={"Retry-After": "5"},
+            )
 
         if req.stream:
             def _sse() -> Iterator[str]:
@@ -348,27 +465,52 @@ def create_app(
                             yield f"data: {json.dumps({'text': chunk.text})}\n\n"
                     yield f"data: {json.dumps({'done': True, 'request_id': rid})}\n\n"
                 except InferenceError as exc:
-                    yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+                    yield f"data: {json.dumps({'error': str(exc), 'request_id': rid})}\n\n"
+
+            async def _sse_async() -> Any:
+                # Iterate the blocking generator on a worker thread so streaming
+                # never blocks the event loop; release capacity when the stream
+                # ends, errors, or the client disconnects (GeneratorExit).
+                try:
+                    async for line in iterate_in_threadpool(_sse()):
+                        yield line
+                finally:
+                    capacity.release()
 
             return StreamingResponse(
-                _sse(), media_type="text/event-stream",
-                headers={"X-Request-ID": rid, "Cache-Control": "no-cache"},
+                _sse_async(), media_type="text/event-stream",
+                headers={
+                    "X-Request-ID": rid,
+                    "Cache-Control": "no-store",
+                    # Ask compatible proxies (nginx) not to buffer the SSE stream.
+                    "X-Accel-Buffering": "no",
+                },
             )
 
         try:
-            result = eng.generate(req.prompt, **gen_kwargs)
+            # Run blocking inference off the event loop, under an optional total
+            # request deadline (across retries), distinct from the per-attempt one.
+            call = run_in_threadpool(eng.generate, req.prompt, **gen_kwargs)
+            if settings.request_deadline_s > 0:
+                import asyncio
+
+                result = await asyncio.wait_for(call, timeout=settings.request_deadline_s)
+            else:
+                result = await call
+        except (TimeoutError, InferenceTimeoutError) as exc:
+            return JSONResponse(status_code=504,
+                                content=ErrorResponse.of("timeout", str(exc), rid))
         except ModelUnavailableError as exc:
             return JSONResponse(status_code=503,
                                 content=ErrorResponse.of("model_unavailable", str(exc), rid))
-        except InferenceTimeoutError as exc:
-            return JSONResponse(status_code=504,
-                                content=ErrorResponse.of("timeout", str(exc), rid))
         except ServiceUnavailableError as exc:
             return JSONResponse(status_code=503,
                                 content=ErrorResponse.of("service_unavailable", str(exc), rid))
         except InferenceError as exc:
             return JSONResponse(status_code=500,
                                 content=ErrorResponse.of("inference_error", str(exc), rid))
+        finally:
+            capacity.release()
 
         return GenerateResponse(request_id=rid, model=result.model, response=result.text)
 
@@ -381,12 +523,27 @@ def create_app(
     def _require_registry() -> ModelRegistry:
         if registry is None:
             raise HTTPException(status_code=503, detail="no model registry configured")
+        if registry.read_only:
+            # GitOps/read-only hosted mode: runtime mutation is deliberately
+            # disabled. Lifecycle changes go through reviewed source-controlled
+            # registry updates, not this endpoint. (Authorization is still checked
+            # first, so a non-admin sees 403, an admin sees this 503.)
+            raise HTTPException(
+                status_code=503,
+                detail="model registry is read-only (GitOps); manage it via reviewed "
+                "source-controlled changes",
+            )
         return registry
+
+    def _subject(request: Request) -> str:
+        principal = getattr(request.state, "principal", None)
+        return principal.subject if principal is not None else "unknown"
 
     @app.post(
         f"/{API_VERSION}/admin/models/register",
         dependencies=[Depends(require_scopes(SCOPE_ADMIN_MODELS))],
-        responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+        responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse},
+                   503: {"model": ErrorResponse}},
     )
     async def admin_register(req: RegisterModelRequest, request: Request) -> Any:
         from gemma_cyber.inference.registry import ModelRecord
@@ -398,47 +555,59 @@ def create_app(
             notes=req.notes,
         )
         try:
-            reg.register(rec, overwrite=req.overwrite)
-        except Exception as exc:
+            reg.register(rec, overwrite=req.overwrite, subject=_subject(request))
+        except RegistryReadOnlyError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except RegistryError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        logger.info("admin register version=%s subject=%s", req.version,
-                    getattr(request.state, "principal", None) and request.state.principal.subject)
+        logger.info("admin register version=%s subject=%s", req.version, _subject(request))
         return {"version": rec.version, "stage": rec.stage}
 
     @app.post(
         f"/{API_VERSION}/admin/models/{{version}}/mark-evaluated",
         dependencies=[Depends(require_scopes(SCOPE_ADMIN_MODELS))],
-        responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+        responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse},
+                   503: {"model": ErrorResponse}},
     )
     async def admin_mark_evaluated(version: str, passed: bool, request: Request,
                                    eval_ref: str | None = None) -> Any:
         reg = _require_registry()
         try:
-            rec = reg.mark_evaluated(version, passed=passed, eval_ref=eval_ref)
-        except Exception as exc:
+            rec = reg.mark_evaluated(
+                version, passed=passed, eval_ref=eval_ref, subject=_subject(request)
+            )
+        except RegistryReadOnlyError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except RegistryError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        logger.info("admin mark-evaluated version=%s passed=%s subject=%s",
+                    version, passed, _subject(request))
         return {"version": rec.version, "stage": rec.stage, "passed_eval": rec.passed_eval}
 
     @app.post(
         f"/{API_VERSION}/admin/models/{{version}}/promote",
         dependencies=[Depends(require_scopes(SCOPE_ADMIN_MODELS))],
         responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse},
-                   422: {"model": ErrorResponse}},
+                   422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
     )
     async def admin_promote(version: str, req: PromoteRequest, request: Request) -> Any:
         from typing import cast
 
-        from gemma_cyber.inference.errors import RegistryError
         from gemma_cyber.inference.registry import Stage
 
         reg = _require_registry()
         try:
             # promote() validates unknown stages and raises; cast satisfies the typed API.
-            rec = reg.promote(version, cast(Stage, req.to), reason=req.reason)
+            rec = reg.promote(
+                version, cast(Stage, req.to), reason=req.reason, subject=_subject(request)
+            )
+        except RegistryReadOnlyError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except RegistryError as exc:
             # Gate violation (e.g. promote without a passing eval) -> 422.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        logger.info("admin promote version=%s -> %s", version, rec.stage)
+        logger.info("admin promote version=%s -> %s subject=%s",
+                    version, rec.stage, _subject(request))
         return {"version": rec.version, "stage": rec.stage}
 
     return app

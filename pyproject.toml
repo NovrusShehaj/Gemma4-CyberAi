@@ -83,6 +83,9 @@ module = [
     "trl.*",
     "bitsandbytes.*",
     "datasets.*",
+    # uvicorn is a runtime-only (api-extra) dependency imported inside server.run();
+    # the dev/CI env type-checks without it. Runtime installs it via the api extra.
+    "uvicorn.*",
 ]
 ignore_missing_imports = true
 

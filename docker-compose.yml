@@ -11,7 +11,10 @@
 
 services:
   ollama:
-    image: ollama/ollama:latest
+    # Pin for a reproducible release: set OLLAMA_IMAGE to a specific version or
+    # digest (e.g. ollama/ollama:0.x.y or ...@sha256:...). `latest` is a dev
+    # default only — do NOT ship `latest` in production (see docs/deployment.md).
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
     volumes:
       - ollama-models:/root/.ollama   # persist pulled models across restarts
     # Not published to the host: only the api service reaches it over the
@@ -44,9 +47,19 @@ services:
       # ...or a static dev-grade token, and a rate limit when exposed publicly:
       # GEMMA_CYBER_API_TOKEN: ${GEMMA_CYBER_API_TOKEN}
       # GEMMA_CYBER_RATE_LIMIT_PER_MIN: "60"
+      # --- Capacity / product policy (hosted defaults are already safe) ---
+      # GEMMA_CYBER_MAX_CONCURRENT_GENERATIONS: "4"   # bound in-flight generations
+      # GEMMA_CYBER_CORS_ORIGINS: "https://app.example.com"  # exact origins only
+      # GEMMA_CYBER_WEB_AUTH0_CLIENT_ID: ${GEMMA_CYBER_WEB_AUTH0_CLIENT_ID}  # public SPA id
       GEMMA_CYBER_REGISTRY_PATH: /app/registry/registry.json
     volumes:
-      # Mount the registry so promotions persist and are auditable on the host.
+      # Registry is mounted READ-ONLY (:ro). Hosted mode defaults to a GitOps,
+      # read-only registry — runtime admin-mutation routes are disabled and model
+      # lifecycle changes go through reviewed, source-controlled updates to
+      # data/models/registry.json. This matches the app's registry_writable=false
+      # default in staging/prod, so writes fail safely rather than corrupting a
+      # host-mounted file. To allow runtime mutation instead, provide a durable
+      # writable volume AND set GEMMA_CYBER_REGISTRY_WRITABLE=true.
       - ./data/models:/app/registry:ro
     ports:
       - "127.0.0.1:8000:8000"   # bind to localhost; front with a proxy for public use

@@ -1,9 +1,10 @@
 name: CI
 
-# Automated regression detection: run the test suite on every push and PR.
-# The suite is environment-safe — it needs no Ollama, no models, and no external
-# LLM/API. The one live inference test auto-skips when Ollama is unreachable, and the
-# LLM-judge tests mock the provider at the client boundary.
+# Automated regression detection + supply-chain checks on every push and PR.
+# The suite is environment-safe — no Ollama, no models, no external LLM/API.
+# Dependency installs are LOCKFILE-AUTHORITATIVE: `uv sync --locked` fails if
+# uv.lock is stale, so CI can never silently resolve a newer dependency graph
+# than the committed lock (which is also what the Docker image installs).
 on:
   push:
   pull_request:
@@ -19,25 +20,17 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install project (with dev deps)
-        # Install into an isolated uv-managed venv, never the runner's
-        # externally-managed /usr Python (PEP 668 forbids installing into it).
-        # `uv pip install` auto-discovers the `.venv` created just above.
-        # Interpreter matches pyproject (requires-python >=3.11,<3.13).
-        run: |
-          uv venv --python 3.12
-          uv pip install -e ".[dev]"
+      - name: Sync locked dependencies (dev extra)
+        # --locked: error out if uv.lock is out of date with pyproject.toml.
+        run: uv sync --locked --extra dev
 
-      # Each tool runs via `uv run --no-sync`, which invokes it from the `.venv`
-      # above without re-resolving (the project has no committed lockfile), so the
-      # `[dev]` tools stay installed and are always found.
-      - name: Run ruff check
+      - name: Ruff (lint)
         run: uv run --no-sync ruff check src tests scripts
 
-      - name: Run mypy type check
+      - name: Mypy (types)
         run: uv run --no-sync mypy src tests scripts
 
-      - name: Run tests
+      - name: Pytest
         run: uv run --no-sync pytest
 
   security:
@@ -52,25 +45,85 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install project (with dev deps)
-        run: |
-          uv venv --python 3.12
-          uv pip install -e ".[dev]"
+      - name: Sync locked dependencies (dev extra)
+        run: uv sync --locked --extra dev
 
       # Python static security analysis. -ll = medium severity and up, so the
-      # intentional `assert` invariants (B101, low) don't fail the gate. The
-      # baseline is documented in docs/security.md — do not blanket-suppress.
+      # intentional `assert` invariants (B101, low) don't fail the gate.
       - name: Bandit (static security)
         run: uv run --no-sync bandit -r src -ll
 
-      # Dependency vulnerability audit of the installed environment. Our own
-      # unpublished package is skipped (not on PyPI); real deps must be clean.
+      # Dependency vulnerability audit of the LOCKED environment.
       - name: pip-audit (dependency CVEs)
         run: uv run --no-sync pip-audit --progress-spinner off --skip-editable
 
-      # Secret scanning across the full git history. gitleaks-action is free for
-      # personal accounts; org accounts need GITLEAKS_LICENSE (see docs/security.md).
+      # Secret scanning across the full git history.
       - name: Gitleaks (secret scan)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  package:
+    # Build the wheel/sdist, install the built wheel into a clean environment,
+    # and verify the package is importable, the console script works, and the
+    # web assets that app.py reads at runtime are actually shipped in the wheel.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Verify web assets are packaged in the wheel
+        run: |
+          python - <<'PY'
+          import glob, zipfile, sys
+          wheel = sorted(glob.glob("dist/*.whl"))[-1]
+          names = zipfile.ZipFile(wheel).namelist()
+          required = [
+              "gemma_cyber/api/web/index.html",
+              "gemma_cyber/api/web/app.js",
+              "gemma_cyber/api/web/styles.css",
+          ]
+          missing = [r for r in required if r not in names]
+          if missing:
+              print("MISSING from wheel:", missing); sys.exit(1)
+          print("web assets present in", wheel)
+          PY
+
+      - name: Clean-install the built wheel (with api extra) and smoke it
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --upgrade pip
+          /tmp/clean/bin/pip install "$(ls dist/*.whl)[api]"
+          /tmp/clean/bin/gemma-cyber version
+          /tmp/clean/bin/python -c "from gemma_cyber.api.app import create_app; print('import ok')"
+
+  container:
+    # Build the API image and verify it (a) builds from the locked deps and
+    # (b) fail-closes: ENV=prod with no auth configured must refuse to start.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -t gemma-cyber-api:ci .
+
+      - name: Non-root runtime
+        run: |
+          user="$(docker run --rm gemma-cyber-api:ci whoami)"
+          echo "runtime user: $user"
+          test "$user" = "app"
+
+      - name: Fail-closed in prod without auth
+        run: |
+          # create_app() raises in prod with no auth -> process exits non-zero.
+          if docker run --rm -e GEMMA_CYBER_ENV=prod gemma-cyber-api:ci \
+               python -c "from gemma_cyber.api.app import create_app; from gemma_cyber.inference import load_settings; create_app(load_settings())"; then
+            echo "ERROR: prod started without auth (should have failed closed)"; exit 1
+          else
+            echo "OK: prod without auth refused to start"
+          fi

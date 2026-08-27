@@ -53,10 +53,12 @@ def test_full_lifecycle(tmp_path):
     assert reg.get("m").stage == "candidate"
     reg.promote("m", "production")
     assert reg.get("m").stage == "production"
-    # History records each hop.
-    assert [h["to"] for h in reg.get("m").history] == [
-        "evaluated", "candidate", "production",
+    # History records creation (from==to) then each promotion hop, with subject.
+    hist = reg.get("m").history
+    assert [h["to"] for h in hist] == [
+        "experimental", "evaluated", "candidate", "production",
     ]
+    assert all("subject" in h for h in hist)
 
 
 def test_failed_eval_does_not_advance(tmp_path):

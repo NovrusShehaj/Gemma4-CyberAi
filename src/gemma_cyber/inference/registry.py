@@ -28,6 +28,8 @@ writers are out of scope for a solo/small-team tool.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -61,6 +63,10 @@ _REQUIRES_EVAL: set[Stage] = {"candidate", "production"}
 
 class PromotionError(RegistryError):
     """A requested stage transition is not allowed (bad transition or ungated)."""
+
+
+class RegistryReadOnlyError(RegistryError):
+    """A write was attempted against a registry opened read-only (GitOps mode)."""
 
 
 def _now() -> str:
@@ -104,8 +110,9 @@ class ModelRecord:
 class ModelRegistry:
     """JSON-backed registry of model versions and their promotion stages."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
         self.path = Path(path)
+        self.read_only = read_only
         self._records: dict[str, ModelRecord] = {}
         if self.path.exists():
             self._load()
@@ -123,13 +130,43 @@ class ModelRegistry:
             self._records[rec.version] = rec
 
     def save(self) -> None:
+        """Persist atomically: write a sibling temp file, fsync, then ``os.replace``.
+
+        ``os.replace`` is atomic on the same filesystem, so a crash mid-write can
+        never leave a truncated/corrupt registry — a reader sees either the old or
+        the new file, never a partial one. The file is created with owner-only
+        permissions (0600) so a host-mounted registry isn't world-readable.
+        Refuses to write when opened ``read_only`` (GitOps/hosted mode).
+        """
+        if self.read_only:
+            raise RegistryReadOnlyError(
+                f"registry at {self.path} is read-only; manage it via reviewed "
+                "source-controlled changes (GitOps), not runtime mutation"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema": "gemma-cyber/model-registry@1",
             "updated_at": _now(),
             "models": [r.to_dict() for r in self._records.values()],
         }
-        self.path.write_text(json.dumps(payload, indent=2) + "\n")
+        data = json.dumps(payload, indent=2) + "\n"
+        fd, tmp = tempfile.mkstemp(
+            dir=str(self.path.parent), prefix=".registry.", suffix=".tmp"
+        )
+        try:
+            os.chmod(tmp, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self.path)
+        except BaseException:
+            # Leave the existing registry untouched; clean up the temp file.
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     # -- reads --------------------------------------------------------------
 
@@ -173,18 +210,37 @@ class ModelRegistry:
 
     # -- writes -------------------------------------------------------------
 
-    def register(self, record: ModelRecord, *, overwrite: bool = False) -> ModelRecord:
+    def register(
+        self, record: ModelRecord, *, overwrite: bool = False, subject: str | None = None
+    ) -> ModelRecord:
         if record.version in self._records and not overwrite:
             raise RegistryError(
                 f"version {record.version!r} already registered (use overwrite=True)"
             )
         record.updated_at = _now()
+        # A brand-new record starts its audit trail with a uniform history entry so
+        # the creating subject is attributable; ``from``==``to`` marks a creation.
+        if not record.history:
+            record.history.append(
+                {
+                    "from": record.stage,
+                    "to": record.stage,
+                    "at": _now(),
+                    "reason": "registered",
+                    "subject": subject or "unknown",
+                }
+            )
         self._records[record.version] = record
         self.save()
         return record
 
     def mark_evaluated(
-        self, version: str, *, passed: bool, eval_ref: str | None = None
+        self,
+        version: str,
+        *,
+        passed: bool,
+        eval_ref: str | None = None,
+        subject: str | None = None,
     ) -> ModelRecord:
         """Record an evaluation outcome and, on a pass, advance to ``evaluated``.
 
@@ -196,13 +252,22 @@ class ModelRegistry:
         rec.passed_eval = passed
         rec.eval_ref = eval_ref
         if passed and rec.stage == "experimental":
-            self._transition(rec, "evaluated", reason="passed evaluation gate")
+            self._transition(
+                rec, "evaluated", reason="passed evaluation gate", subject=subject
+            )
         else:
             rec.updated_at = _now()
         self.save()
         return rec
 
-    def promote(self, version: str, to: Stage, *, reason: str | None = None) -> ModelRecord:
+    def promote(
+        self,
+        version: str,
+        to: Stage,
+        *,
+        reason: str | None = None,
+        subject: str | None = None,
+    ) -> ModelRecord:
         rec = self.get(version)
         if to not in STAGES:
             raise PromotionError(f"unknown stage {to!r}")
@@ -221,15 +286,23 @@ class ModelRegistry:
             incumbent = self.production()
             if incumbent is not None and incumbent.version != version:
                 self._transition(
-                    incumbent, "candidate", reason=f"demoted for {version}"
+                    incumbent, "candidate", reason=f"demoted for {version}", subject=subject
                 )
-        self._transition(rec, to, reason=reason or "manual promotion")
+        self._transition(rec, to, reason=reason or "manual promotion", subject=subject)
         self.save()
         return rec
 
-    def _transition(self, rec: ModelRecord, to: Stage, *, reason: str) -> None:
+    def _transition(
+        self, rec: ModelRecord, to: Stage, *, reason: str, subject: str | None = None
+    ) -> None:
         rec.history.append(
-            {"from": rec.stage, "to": to, "at": _now(), "reason": reason}
+            {
+                "from": rec.stage,
+                "to": to,
+                "at": _now(),
+                "reason": reason,
+                "subject": subject or "unknown",
+            }
         )
         rec.stage = to
         rec.updated_at = _now()

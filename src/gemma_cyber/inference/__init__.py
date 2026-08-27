@@ -18,7 +18,7 @@ the CLI/API/eval callers.
 
 from __future__ import annotations
 
-from gemma_cyber.inference.config import Settings, load_settings
+from gemma_cyber.inference.config import ConfigError, Settings, load_settings
 from gemma_cyber.inference.engine import (
     HealthStatus,
     InferenceEngine,
@@ -34,11 +34,13 @@ from gemma_cyber.inference.registry import (
     ModelRecord,
     ModelRegistry,
     PromotionError,
+    RegistryReadOnlyError,
     Stage,
 )
 
 __all__ = [
     "STAGES",
+    "ConfigError",
     "HealthStatus",
     "InferenceEngine",
     "InferenceError",
@@ -46,6 +48,7 @@ __all__ = [
     "ModelRegistry",
     "ModelUnavailableError",
     "PromotionError",
+    "RegistryReadOnlyError",
     "ServiceUnavailableError",
     "Settings",
     "Stage",

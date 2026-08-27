@@ -1,11 +1,16 @@
 # Gemma-Cyber API service image.
 #
-# This image runs the FastAPI inference service ONLY. The model runtime (Ollama)
-# runs as a separate service/container — see docker-compose.yml — because the two
-# have very different resource profiles (the API is tiny; Ollama holds the model).
-# Keeping them separate is the "boring, maintainable" choice: scale, restart, or
-# swap either independently, and the API image stays small and CPU-only.
-
+# Runs the FastAPI inference service ONLY. The model runtime (Ollama) runs as a
+# separate service/container (see docker-compose.yml): different resource
+# profiles, independent scaling/restart, and a small CPU-only API image.
+#
+# Dependencies are installed from the COMMITTED uv.lock (`uv sync --locked`), so
+# the image gets exactly the reviewed dependency graph CI tested — not a fresh,
+# possibly-newer pip resolution. `uv.lock` is authoritative for CI and the image.
+#
+# RELEASE NOTE: for a reproducible production build, pin the base image by digest
+# (FROM python:3.12-slim@sha256:...) after selecting/reviewing one. The tag below
+# is a moving target and is intentionally left for the release owner to pin.
 FROM python:3.12-slim AS base
 
 # Non-root by default (least privilege).
@@ -13,17 +18,23 @@ RUN groupadd --system app && useradd --system --gid app --home /app app
 
 WORKDIR /app
 
-# Install deps first for layer caching. Copy only what the build needs.
-COPY pyproject.toml README.md ./
+# uv is a build-time tool; the app's dependency versions come from uv.lock, so
+# uv's own version does not affect the resolved graph (--locked uses the lock).
+RUN pip install --no-cache-dir --upgrade pip uv
+
+# Copy lock + manifest first for layer caching, then source.
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-# Install the package with the API extra. --no-cache-dir keeps the image lean.
-RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir ".[api]"
+# Install the locked production graph (api extra, no dev tools) into /app/.venv.
+# --frozen: never update the lock; fail if it is out of date.
+RUN uv sync --locked --frozen --no-dev --extra api \
+ && chown -R app:app /app
 
-# The registry is optional metadata; mount or bake it and point the app at it.
-# NOTE: ENV=prod is a SAFE default — with it the app fail-closes (refuses to start)
-# unless auth is configured (GEMMA_CYBER_AUTH_DOMAIN+AUDIENCE, or GEMMA_CYBER_API_TOKEN).
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# ENV=prod is a SAFE default — the app fail-closes (refuses to start) unless auth
+# is configured (GEMMA_CYBER_AUTH_DOMAIN+AUDIENCE, or GEMMA_CYBER_API_TOKEN).
 # docker-compose overrides ENV=staging for a startable local stack. See docs/auth.md.
 ENV GEMMA_CYBER_API_HOST=0.0.0.0 \
     GEMMA_CYBER_API_PORT=8000 \

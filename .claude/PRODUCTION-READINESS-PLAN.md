@@ -255,3 +255,65 @@ frontend build pipeline, billing/usage admin.
 ## 22. Explicitly out of scope (this pass)
 RAG, autonomous agents/tools, Kubernetes, microservices, GPU serving, a user/account
 database, live Auth0 tenant provisioning, real cloud deployment execution.
+
+---
+
+## 23. Session update — 2026-08-27 (Opus 4.8: web Auth0 + reliability + config/registry + CI lockfile)
+
+Landed against `claud-prod-plan.md` (Phases 1–6, repository-implementable scope). All
+green: ruff clean, mypy clean, **209 tests** (was 177). Baseline was already green.
+
+**Phase 1 — config governance & registry**
+- `Settings.validate()` (new `ConfigError`): rejects unknown env, non-URL Ollama host,
+  negative/zero bounds, bad log level, non-`https` CORS entries, and `'*'` CORS in
+  hosted mode. Called at `create_app` startup (fail fast) and by `gemma-cyber-serve`.
+- Hosted (`staging`/`prod`) defaults locked: `allow_client_overrides=false` (server owns
+  the safety prompt; client `system` dropped) and `model` must resolve to a registered
+  version/stage alias (else `400 bad_model`). `registry_writable=false` (GitOps read-only).
+- Registry hardened: atomic `os.replace` writes + `fsync`, owner-only `0600`, a
+  `read_only` guard (`RegistryReadOnlyError`), and **subject attribution** on every
+  transition. Hosted admin-mutation routes return 503 (GitOps). Compose mount stays `:ro`.
+- Interactive docs (`/docs`,`/redoc`,`/openapi.json`) disabled in hosted mode.
+
+**Phase 2/4 — Auth0 browser SPA + modern dark UI**
+- Vanilla PKCE (Authorization Code, S256) in `web/app.js` — no SDK, so CSP `script-src`
+  stays `'self'`. Access token **in memory only**; only the one-time verifier/state
+  transit sessionStorage and are cleared at callback. Bearer attached to same-origin
+  `/v1/*` only. Deterministic states: signed-out gate, callback, ready, generating,
+  token-expired, 401/403/429/503/504, logout, cancel (AbortController), SSE errors.
+- New `/config.json` (public SPA bootstrap), `/styles.css`; HTML `no-store`, assets
+  `no-cache`. CSP widened to the Auth0 origin *only* for `connect-src`/`form-action`
+  and *only* when `GEMMA_CYBER_WEB_AUTH0_CLIENT_ID` is set. Output rendered via
+  `textContent` exclusively. Dark-first design tokens; accessible shell (skip link,
+  landmarks, labels, focus, reduced-motion, 320px/responsive).
+
+**Phase 3 — reliability & transport**
+- Blocking inference moved off the event loop (`run_in_threadpool` /
+  `iterate_in_threadpool`). Bounded admission (`Capacity`, `MAX_CONCURRENT_GENERATIONS`)
+  → deterministic `503 at_capacity` + `Retry-After`; capacity released on success,
+  error, cancel, and client disconnect. Optional total request deadline
+  (`REQUEST_DEADLINE_S`). Request-id sanitised (`[A-Za-z0-9._-]{1,64}`, else generated).
+  SSE sets `Cache-Control: no-store` + `X-Accel-Buffering: no`. Reference edge config at
+  `deploy/nginx.reference.conf`.
+
+**Phase 5 — observability**
+- Structured JSON logging (`api/logging_setup.py`) with a field **allowlist** (stray
+  prompt/token dropped); `GEMMA_CYBER_LOG_LEVEL` applied at serve startup; uvicorn logs
+  unified. Lifespan logs ready/shutdown posture. `server.run()` builds the app before
+  serving (fail fast) and validates `GEMMA_CYBER_API_PORT`.
+
+**Phase 6 — CI/CD & supply chain**
+- `uv.lock` regenerated (was stale: missing the whole web stack). CI + Docker now
+  **lockfile-authoritative** (`uv sync --locked` / `--frozen`). New CI jobs: `package`
+  (build wheel/sdist, assert web assets shipped, clean-install smoke) and `container`
+  (image build, non-root, prod fail-closed). Ollama image pinnable via `OLLAMA_IMAGE`;
+  base-image digest pinning left to the release owner (documented).
+
+**Verification performed:** ruff/mypy/pytest (209) green; `uv sync --locked` +
+`uv lock --check` pass; `docker compose config` valid; server build + JSON-log redaction
+smoke passed. **NOT** locally verified (no Docker daemon / staging / live tenant): image
+build/run, full Auth0 browser E2E, staging load test — implemented and left to CI/staging.
+
+**Still external/blocked:** Auth0 tenant + SPA client id + exact URLs; production
+domain/TLS/proxy deploy; secret manager; base-image digest; **a promoted, evaluated
+model** (registry still correctly has none — not fabricated).
