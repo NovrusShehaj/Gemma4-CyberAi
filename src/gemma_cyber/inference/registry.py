@@ -84,6 +84,7 @@ class ModelRecord:
     dataset_version: str | None = None  # e.g. "sft_v0.2"
     git_commit: str | None = None
     gguf_sha256: str | None = None
+    fused_model_sha256: str | None = None  # SHA-256 of a fused MLX/weight artifact
     experiment: str | None = None  # e.g. "exp-002-gemma3-cyber-v0.2"
     passed_eval: bool = False  # gate flag; set when a scorecard clears the criteria
     eval_ref: str | None = None  # path to the scorecard/results proving the gate

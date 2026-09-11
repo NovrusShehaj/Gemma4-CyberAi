@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from gemma_cyber.api.app import create_app  # noqa: E402
 from gemma_cyber.api.auth import AuthSettings, AuthUnavailableError, TokenVerifier  # noqa: E402
 from gemma_cyber.clients.ollama_client import GenerationResult  # noqa: E402
-from gemma_cyber.inference.config import Settings  # noqa: E402
+from gemma_cyber.inference.config import ConfigError, Settings  # noqa: E402
 from gemma_cyber.inference.engine import HealthStatus, InferenceEngine  # noqa: E402
 from gemma_cyber.inference.registry import ModelRecord, ModelRegistry  # noqa: E402
 
@@ -226,3 +226,38 @@ def test_static_mode_admin_forbidden(tmp_path):
     r = client.post("/v1/admin/models/gemma3-cyber:v0.2/mark-evaluated?passed=true",
                     headers=_auth("secret"))
     assert r.status_code == 403  # static token carries no admin scope
+
+
+def test_hosted_hs256_refuses_to_start():
+    auth = AuthSettings(domain=DOMAIN, audience=AUDIENCE, algorithms=("HS256",))
+    with pytest.raises(ConfigError, match="RS256"):
+        create_app(
+            Settings(environment="prod"),
+            engine=cast(InferenceEngine, FakeEngine()),
+            auth_settings=auth,
+        )
+
+
+def test_hosted_http_jwks_refuses_to_start():
+    auth = AuthSettings(
+        domain=DOMAIN,
+        audience=AUDIENCE,
+        jwks_url="http://insecure.example/.well-known/jwks.json",
+    )
+    with pytest.raises(ConfigError, match="https"):
+        create_app(
+            Settings(environment="staging", api_token="secret"),
+            engine=cast(InferenceEngine, FakeEngine()),
+            auth_settings=auth,
+        )
+
+
+def test_dev_hs256_is_allowed():
+    auth = AuthSettings(domain=DOMAIN, audience=AUDIENCE, algorithms=("HS256",))
+    app = create_app(
+        Settings(environment="dev"),
+        engine=cast(InferenceEngine, FakeEngine()),
+        auth_settings=auth,
+        verifier=object(),  # type: ignore[arg-type]
+    )
+    assert app.state.auth_mode == "jwt"

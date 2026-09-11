@@ -34,7 +34,14 @@ This project is for **education, CTFs, defensive security, systems you own, and 
    masking module, pinned deps, run-manifest persistence, GGUF export verifier.
 7. **CI** — ruff + mypy + `pytest` (156 tests) on every push/PR; environment-safe.
 
-It does **not** (yet) do RAG or run agents/tools — those remain later, gated phases.
+8. **`gemma4` — an opt-in local terminal agent** (extra `[agent]`): workspace-aware,
+   tool-using, session-persistent, fail-closed. Default mode is `read-only`; it
+   cannot write a file or run a command until you say so. See
+   [`docs/agent.md`](docs/agent.md).
+
+The **hosted API, web UI, and `gemma-cyber` CLI remain no-tools Q&A** — that
+boundary is enforced by a test, not by convention. The hosted product does **not**
+do RAG and does **not** run agents or tools; those remain later, gated phases.
 
 ---
 
@@ -53,6 +60,14 @@ It does **not** (yet) do RAG or run agents/tools — those remain later, gated p
 uv venv --python 3.12 .venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
+```
+
+To also install the opt-in local agent (this is what makes tool execution exist
+at all — read [`docs/agent.md`](docs/agent.md) first):
+
+```bash
+uv pip install -e ".[agent]"
+gemma4 doctor
 ```
 
 ## Quick start

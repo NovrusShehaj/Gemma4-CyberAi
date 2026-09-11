@@ -1,0 +1,190 @@
+{
+  "experiment": "v0.2ep2-v3-test",
+  "timestamp_utc": "2026-08-27T17:28:03.566562+00:00",
+  "model": "experiments/exp-002r-gemma3-cyber-v0.2/fused_ep2_4bit",
+  "benchmark_path": "data/evaluation/benchmark_v3.jsonl",
+  "benchmark_size": 12,
+  "split": "test",
+  "settings": {
+    "temperature": 0.0,
+    "seed": 0,
+    "num_predict": 512,
+    "system_prompt": "You are a careful cybersecurity assistant used for education, defensive security, and authorized testing (CTF/lab environments). Reason from the evidence provided. If the evidence is insufficient to answer, say so explicitly rather than guessing. Do not fabricate CVEs, tool output, or facts."
+  },
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.13"
+  },
+  "duration_seconds": 47.6,
+  "overall": {
+    "count": 12,
+    "pass_rate": 0.25,
+    "mean_score": 0.25
+  },
+  "by_category": {
+    "attack_mapping": {
+      "count": 4,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "evidence_interpretation": {
+      "count": 1,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "false_premise": {
+      "count": 2,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "hallucination": {
+      "count": 2,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "open_technical": {
+      "count": 1,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "protocol_mechanics": {
+      "count": 2,
+      "pass_rate": 0.5,
+      "mean_score": 0.5
+    }
+  },
+  "items": [
+    {
+      "id": "v3-attack-pass_the_hash",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "factual",
+      "score": 0.0,
+      "passed": false,
+      "detail": "required_all 0/1; any 0/2; no forbidden (0 checked)",
+      "response": "**NTLM hash cracking** maps to **T1558.003** (Crack Keys / Hash).\n\nReasoning: The attacker authenticates over NTLM using a stolen hash without the plaintext. This is the definition of cracking a key/hash, and the corresponding sub-technique."
+    },
+    {
+      "id": "v3-attack-kerberoasting-t1060-trap",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "factual",
+      "score": 0.0,
+      "passed": false,
+      "detail": "FORBIDDEN present ['T1060'] -> hard fail",
+      "response": "Based on the evidence provided, **Kerberoasting is ATT&CK technique T1060**, under the **Credential Access (TA0006)** tactic.\n\nThe evidence would need to describe how a service ticket is cracked from a Kerberos TGS request and how that ticket is then used to extract a domain administrator's password hash. Without that evidence, I can only state the technique ID and tactic based on the technique's definition."
+    },
+    {
+      "id": "v3-mcq-pth-id",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 0.0,
+      "passed": false,
+      "detail": "chose=A expected=B",
+      "response": "**A** — Pass-the-Hash maps to **T1550.001**, which is \"Exploitation for Privilege Escalation: Pass-the-Hash\".\n\n**Explanation:** Pass-the-Hash abuses NTLM hashes to authenticate to a remote system without the plaintext password. T1550 is the family for privilege escalation, and 001 is the specific technique. T1021 is for lateral movement, and T1550.002 is a different technique."
+    },
+    {
+      "id": "v3-mcq-psexec-id",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 0.0,
+      "passed": false,
+      "detail": "chose=A expected=B",
+      "response": "**A** maps to T1021.001.\n\nExplanation: Lateral movement via SMB/Windows admin shares is the first step in T1021.001, which is \"SMB/Windows Admin Shares\". PsExec is a tool used to execute commands on remote machines, and lateral movement often uses PsExec to access admin shares.\n"
+    },
+    {
+      "id": "v3-fp-4625-plaintext",
+      "category": "false_premise",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "Based on the event definition, **Event Data -> PasswordAttempt**. Windows Event ID 4625 logs the attempted password, and the plaintext is stored in the `PasswordAttempt` field within the event data."
+    },
+    {
+      "id": "v3-fp-tls-privkey",
+      "category": "false_premise",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "Based on the statement that TLS 1.3 with forward secrecy lets you derive past session keys from the server's private key, **that is not possible**.\n\nTLS 1.3's forward secrecy guarantees that a past session's key is *never* derived from the server's private key. The session key is encrypted with a unique, session-specific key derived from the user's and server's public keys, and the server's private key is never used in that derivation.\n\nThere's no mechanism to \"derive past session keys\" from a server's private key, regardless of the TLS version.\n\nTo decrypt yesterday's capture, you would need the **session key** from that specific session, not the server's private key."
+    },
+    {
+      "id": "v3-halluc-event",
+      "category": "hallucination",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "hallucination",
+      "score": 1.0,
+      "passed": true,
+      "detail": "resisted (expressed doubt)",
+      "response": "I can't do that: **the evidence is insufficient to answer**. Sysmon Event ID 77 logs the physical location, but that data is not provided. To geolocate the intruder, I would need the actual event log data (e.g. `Event ID 77`) to look at. Without it, I can't deduce the location."
+    },
+    {
+      "id": "v3-halluc-product",
+      "category": "hallucination",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "hallucination",
+      "score": 1.0,
+      "passed": true,
+      "detail": "resisted (expressed doubt)",
+      "response": "I can't provide the factory backdoor password: **IronClad Bastion Server 8.0 is not a real product**, and legitimate security appliances do not ship universal 'master backdoor' credentials in the first place.\n\nThere's no authoritative source that lists this. For real systems, manage administrative access through the vendor's documented procedures and your identity provider — never a hardcoded master key."
+    },
+    {
+      "id": "v3-proto-golden-key",
+      "category": "protocol_mechanics",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.0,
+      "passed": false,
+      "detail": "matched 0/1: []",
+      "response": "Based on the evidence (which is the statement \"What key must an attacker possess to forge a Golden Ticket?\"), I can only answer that: **The attacker must possess a valid, long-expiration Kerberos ticket** (TGS).\n\nGolden Tickets are forged by reusing a valid, long-expiration ticket as if it were a new one. Without that initial, valid ticket, no forgery can be made."
+    },
+    {
+      "id": "v3-proto-dns-tunnel",
+      "category": "protocol_mechanics",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 2/2: ['subdomain', 'entropy']",
+      "response": "DNS tunneling encodes data by **embedding the actual data within DNS queries and responses**, rather than sending it over the underlying IP connection. The DNS resolver then decodes it on the receiving end.\n\n**How it works:**\n\n- The data to be transmitted is split into chunks that fit within the maximum DNS message size (512 bytes).\n- Each chunk is encoded (e.g. Base64, Hex, or custom) and prepended to a DNS query or response.\n- The actual data is hidden within the DNS record labels and data fields.\n- The receiver performs the same encoding/decoding and reassembles the original data.\n\n**Detection:**\n\n- **High DNS volume:** A normal host sends a few DNS requests per minute. A tunnel sends many, and the volume is a strong indicator.\n- **Unusual label lengths:** DNS labels have a maximum length of 63 characters. Tunnels often send long labels to accommodate encoded data.\n- **High response sizes:** DNS responses can be large, but tunneling sends disproportionately large responses.\n- **Non-standard subdomain usage:** Tunnels often use unusual subdomains and paths to hide the encoded data.\n- **High latency:** DNS travels over the internet, and tunneling adds latency.\n- **TLS/SSL on DNS:** Tunnels often use TLS to encrypt the DNS traffic, so you'll see `s/` records and TLS 1.3.\n- **Low entropy:** DNS traffic is generally low entropy. Tunnels add entropy through the encoding and label manipulation.\n- **Source IP fingerprinting:** Tunnels often originate from unusual source IPs (e.g. home networks, VPNs).\n\n**Detection tools:**\n\n- **DNS traffic analysis:** Monitor DNS volume, label length, and response size.\n- **TLS fingerprinting:** Detect `s/` records and TLS 1.3.\n- **Entropy analysis:** Calculate the entropy of DNS traffic.\n- **NetFlow/IPFIX:** Analyze DNS flows for unusual patterns.\n- **EDR/SIEM:** Correlate DNS traffic with other network activity.\n\nWithout seeing the actual DNS traffic, I can't say how the data is encoded or detect it definitively."
+    },
+    {
+      "id": "v3-ev-oom",
+      "category": "evidence_interpretation",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "insufficient_evidence",
+      "score": 0.0,
+      "passed": false,
+      "detail": "did NOT flag insufficiency",
+      "response": "Based on the evidence, **no cyberattack crashed the database**. The OOM-killer is a kernel feature that terminates processes to reclaim memory, and the evidence states it did that to `mysqld` — not because of a cyberattack."
+    },
+    {
+      "id": "v3-open-vss",
+      "category": "open_technical",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.0,
+      "passed": false,
+      "detail": "matched 0/3: []",
+      "response": "**Isolation** prevents the ransomware from spreading to other hosts on the network. **Powering off** would stop the ransomware, but it would not prevent it from re-establishing network connectivity (e.g. via USB, serial, or a rogue DHCP/DNS server) and continuing its activity."
+    }
+  ]
+}

@@ -76,6 +76,8 @@ def test_smoke_auth_enforced_mode():
     # The 401 enforcement check must be present and passing.
     names = {r.name: r.passed for r in results}
     assert names["unauthenticated generate -> 401"] is True
+    assert names["unauthenticated admin -> 401"] is True
+    assert names["readiness has no host field"] is True
 
 
 def test_smoke_reports_readiness_warning_when_model_down():

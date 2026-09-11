@@ -74,6 +74,64 @@ API_VERSION = "v1"
 # Scope required to mutate the model registry (promote/register/mark-evaluated).
 SCOPE_ADMIN_MODELS = "admin:models"
 
+# In-process cache for GET /v1/ready so unauthenticated probes do not hammer Ollama.
+READY_CACHE_TTL_S = 10.0
+
+
+def public_ready_payload(status: Any) -> dict[str, Any]:
+    """Ready JSON for HTTP clients: no runtime URL and no filesystem paths."""
+    detail = status.detail or ""
+    lowered = detail.lower()
+    if "://" in detail or "ollama" in lowered or "/" in detail:
+        if not status.ok:
+            if not getattr(status, "service_reachable", True):
+                detail = "model runtime unreachable"
+            elif not getattr(status, "model_present", True):
+                detail = "configured model is not available"
+            else:
+                detail = "not ready"
+        else:
+            detail = ""
+    return {
+        "ok": status.ok,
+        "service_reachable": status.service_reachable,
+        "model_present": status.model_present,
+        "model": status.model,
+        "detail": detail,
+    }
+
+
+def _client_inference_error(exc: InferenceError) -> tuple[int, str, str]:
+    """Map an inference exception to (status, error code, public detail)."""
+    if isinstance(exc, InferenceTimeoutError):
+        return 504, "timeout", "generation timed out"
+    if isinstance(exc, ModelUnavailableError):
+        return 503, "model_unavailable", "requested model is not available"
+    if isinstance(exc, ServiceUnavailableError):
+        return 503, "service_unavailable", "model runtime unavailable"
+    return 500, "inference_error", "generation failed"
+
+
+def _registry_client_error(exc: RegistryError) -> tuple[int, str, str]:
+    """Map a registry exception to (status, error code, public detail)."""
+    if isinstance(exc, RegistryReadOnlyError):
+        return 503, "registry_read_only", (
+            "model registry is read-only (GitOps); manage it via reviewed "
+            "source-controlled changes"
+        )
+    msg = str(exc).lower()
+    if "already registered" in msg:
+        return 409, "conflict", "model version already registered"
+    if "no registered model" in msg:
+        return 404, "not_found", "model version not found"
+    if (
+        "cannot promote" in msg
+        or "illegal transition" in msg
+        or "unknown stage" in msg
+    ):
+        return 422, "promotion_gate", "promotion is not allowed for this version"
+    return 400, "registry_error", "registry operation failed"
+
 
 def create_app(
     settings: Settings | None = None,
@@ -97,11 +155,14 @@ def create_app(
     from contextlib import asynccontextmanager
 
     from fastapi import Depends, FastAPI, Header, Request
+    from fastapi.exceptions import RequestValidationError
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
     settings = (settings or load_settings()).validate()
-    auth_settings = auth_settings or AuthSettings.from_env()
+    auth_settings = (auth_settings or AuthSettings.from_env()).validate(
+        hosted=settings.hosted
+    )
     if engine is None:
         engine = InferenceEngine.from_settings(settings)
     if registry is None and settings.registry_path and settings.registry_path.exists():
@@ -126,6 +187,12 @@ def create_app(
         logger.warning(
             "production is using the static API token; prefer Auth0 JWT "
             "(GEMMA_CYBER_AUTH_DOMAIN/AUDIENCE) for real identity + authorization."
+        )
+    if settings.hosted and settings.registry_writable and not auth_configured:
+        raise RuntimeError(
+            "hosted environment with a writable registry requires authentication. "
+            "Set GEMMA_CYBER_AUTH_DOMAIN + GEMMA_CYBER_AUTH_AUDIENCE (Auth0) "
+            "or GEMMA_CYBER_API_TOKEN. Refusing to start."
         )
 
     if jwt_mode and verifier is None:
@@ -186,6 +253,7 @@ def create_app(
     app.state.auth_settings = auth_settings
     app.state.verifier = verifier
     app.state.auth_mode = "jwt" if jwt_mode else ("static" if static_mode else "open")
+    app.state._ready_cache = None  # (monotonic_ts, payload, status_code)
 
     if settings.cors_origins:
         app.add_middleware(
@@ -227,6 +295,27 @@ def create_app(
             },
         )
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def _on_validation_error(request: Request, exc: RequestValidationError):
+        # Do not echo request `input` (prompts) back to the client.
+        rid = getattr(request.state, "request_id", None)
+        errors = []
+        for err in exc.errors():
+            safe = {k: v for k, v in err.items() if k != "input"}
+            ctx = safe.get("ctx")
+            if isinstance(ctx, dict):
+                safe["ctx"] = {ck: cv for ck, cv in ctx.items() if ck != "input"}
+            errors.append(safe)
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "validation_error",
+                "detail": "invalid request",
+                "request_id": rid,
+                "errors": errors,
+            },
+        )
 
     # -- authentication + authorization dependencies ------------------------
 
@@ -282,13 +371,18 @@ def create_app(
     def require_scopes(*needed: str):
         """Dependency factory: require ALL of ``needed`` scopes on the principal.
 
-        When auth is disabled (open dev mode), access is allowed so local
-        development is frictionless; privileged endpoints are only truly protected
-        once JWT (or static) auth is configured — documented in docs/auth.md.
+        Open (dev) mode fail-opens so local development stays frictionless.
+        Hosted mode never grants anonymous admin: missing auth is 401.
         """
         def _dep(request: Request, principal: Principal = Depends(get_principal)) -> Principal:
             rid = getattr(request.state, "request_id", "-")
             if not auth_configured:
+                if settings.hosted:
+                    logger.warning(
+                        "authz failure: hosted privileged route with no auth configured",
+                        extra={"request_id": rid},
+                    )
+                    raise HTTPException(status_code=401, detail="authentication required")
                 return principal
             if not principal.has_all(needed):
                 logger.warning(
@@ -312,7 +406,12 @@ def create_app(
             # Bucket authenticated callers by identity, not shared IP.
             client = f"sub:{principal.subject}"
         if not limiter.allow(client):
-            raise HTTPException(status_code=429, detail="rate limit exceeded")
+            retry_after = str(limiter.retry_after_s(client))
+            raise HTTPException(
+                status_code=429,
+                detail="rate limit exceeded",
+                headers={"Retry-After": retry_after},
+            )
 
     # -- routes -------------------------------------------------------------
 
@@ -370,9 +469,16 @@ def create_app(
 
     @app.get(f"/{API_VERSION}/ready", response_model=HealthResponse)
     async def ready() -> Any:
-        status = engine.health()
-        code = 200 if status.ok else 503
-        return JSONResponse(status_code=code, content=status.to_dict())
+        now = time.monotonic()
+        cached = app.state._ready_cache
+        if cached is not None and (now - cached[0]) < READY_CACHE_TTL_S:
+            payload, code = cached[1], cached[2]
+        else:
+            status = engine.health()
+            payload = public_ready_payload(status)
+            code = 200 if status.ok else 503
+            app.state._ready_cache = (now, payload, code)
+        return JSONResponse(status_code=code, content=payload)
 
     @app.get(f"/{API_VERSION}/models", response_model=ModelsResponse)
     async def models() -> Any:
@@ -429,8 +535,13 @@ def create_app(
         try:
             eng = _resolve_engine(req.model)
         except InferenceError as exc:
+            logger.warning("bad model selection: %s", exc, extra={"request_id": rid})
             return JSONResponse(status_code=400,
-                                content=ErrorResponse.of("bad_model", str(exc), rid))
+                                content=ErrorResponse.of(
+                                    "bad_model",
+                                    "model is not a released version or stage alias",
+                                    rid,
+                                ))
 
         gen_kwargs: dict[str, Any] = {"request_id": rid}
         # Product policy: unless client overrides are explicitly enabled, the
@@ -465,7 +576,12 @@ def create_app(
                             yield f"data: {json.dumps({'text': chunk.text})}\n\n"
                     yield f"data: {json.dumps({'done': True, 'request_id': rid})}\n\n"
                 except InferenceError as exc:
-                    yield f"data: {json.dumps({'error': str(exc), 'request_id': rid})}\n\n"
+                    logger.warning(
+                        "sse inference error: %s", exc, extra={"request_id": rid}
+                    )
+                    yield (
+                        f"data: {json.dumps({'error': 'generation_failed', 'request_id': rid})}\n\n"
+                    )
 
             async def _sse_async() -> Any:
                 # Iterate the blocking generator on a worker thread so streaming
@@ -498,17 +614,17 @@ def create_app(
             else:
                 result = await call
         except (TimeoutError, InferenceTimeoutError) as exc:
-            return JSONResponse(status_code=504,
-                                content=ErrorResponse.of("timeout", str(exc), rid))
-        except ModelUnavailableError as exc:
-            return JSONResponse(status_code=503,
-                                content=ErrorResponse.of("model_unavailable", str(exc), rid))
-        except ServiceUnavailableError as exc:
-            return JSONResponse(status_code=503,
-                                content=ErrorResponse.of("service_unavailable", str(exc), rid))
+            logger.warning("generate timeout: %s", exc, extra={"request_id": rid})
+            return JSONResponse(
+                status_code=504,
+                content=ErrorResponse.of("timeout", "generation timed out", rid),
+            )
         except InferenceError as exc:
-            return JSONResponse(status_code=500,
-                                content=ErrorResponse.of("inference_error", str(exc), rid))
+            logger.warning("generate failed: %s", exc, extra={"request_id": rid})
+            status, code, detail = _client_inference_error(exc)
+            return JSONResponse(
+                status_code=status, content=ErrorResponse.of(code, detail, rid)
+            )
         finally:
             capacity.release()
 
@@ -548,6 +664,7 @@ def create_app(
     async def admin_register(req: RegisterModelRequest, request: Request) -> Any:
         from gemma_cyber.inference.registry import ModelRecord
 
+        rid = getattr(request.state, "request_id", None)
         reg = _require_registry()
         rec = ModelRecord(
             version=req.version, base_model=req.base_model,
@@ -556,10 +673,12 @@ def create_app(
         )
         try:
             reg.register(rec, overwrite=req.overwrite, subject=_subject(request))
-        except RegistryReadOnlyError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except RegistryError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            logger.warning("admin register failed: %s", exc, extra={"request_id": rid})
+            status, code, detail = _registry_client_error(exc)
+            return JSONResponse(
+                status_code=status, content=ErrorResponse.of(code, detail, rid)
+            )
         logger.info("admin register version=%s subject=%s", req.version, _subject(request))
         return {"version": rec.version, "stage": rec.stage}
 
@@ -571,15 +690,20 @@ def create_app(
     )
     async def admin_mark_evaluated(version: str, passed: bool, request: Request,
                                    eval_ref: str | None = None) -> Any:
+        rid = getattr(request.state, "request_id", None)
         reg = _require_registry()
         try:
             rec = reg.mark_evaluated(
                 version, passed=passed, eval_ref=eval_ref, subject=_subject(request)
             )
-        except RegistryReadOnlyError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except RegistryError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            logger.warning(
+                "admin mark-evaluated failed: %s", exc, extra={"request_id": rid}
+            )
+            status, code, detail = _registry_client_error(exc)
+            return JSONResponse(
+                status_code=status, content=ErrorResponse.of(code, detail, rid)
+            )
         logger.info("admin mark-evaluated version=%s passed=%s subject=%s",
                     version, passed, _subject(request))
         return {"version": rec.version, "stage": rec.stage, "passed_eval": rec.passed_eval}
@@ -595,17 +719,19 @@ def create_app(
 
         from gemma_cyber.inference.registry import Stage
 
+        rid = getattr(request.state, "request_id", None)
         reg = _require_registry()
         try:
             # promote() validates unknown stages and raises; cast satisfies the typed API.
             rec = reg.promote(
                 version, cast(Stage, req.to), reason=req.reason, subject=_subject(request)
             )
-        except RegistryReadOnlyError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except RegistryError as exc:
-            # Gate violation (e.g. promote without a passing eval) -> 422.
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            logger.warning("admin promote failed: %s", exc, extra={"request_id": rid})
+            status, code, detail = _registry_client_error(exc)
+            return JSONResponse(
+                status_code=status, content=ErrorResponse.of(code, detail, rid)
+            )
         logger.info("admin promote version=%s -> %s subject=%s",
                     version, rec.stage, _subject(request))
         return {"version": rec.version, "stage": rec.stage}

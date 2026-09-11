@@ -42,6 +42,8 @@ def _looks_like_http_url(value: str) -> bool:
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "gemma3:4b"
 DEFAULT_REGISTRY_PATH = _REPO_ROOT / "data" / "models" / "registry.json"
+# Hosted (staging/prod) generate cap. 0 remains valid only in dev/test.
+DEFAULT_HOSTED_RATE_LIMIT_PER_MIN = 60
 
 # The careful, safety-forward system prompt. Kept identical to the evaluation
 # harness's BASELINE_SYSTEM_PROMPT so chat and benchmark share one behavior; the
@@ -73,13 +75,17 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-def _env_int(name: str, default: int) -> int:
+def _env_int(name: str, default: int, *, strict: bool = False) -> int:
     raw = _env(name)
     if raw is None or raw == "":
         return default
     try:
         return int(raw)
     except ValueError:
+        if strict:
+            raise ConfigError(
+                f"GEMMA_CYBER_{name} must be an integer, got {raw!r}"
+            ) from None
         return default
 
 
@@ -191,6 +197,10 @@ class Settings:
             raise ConfigError(
                 f"GEMMA_CYBER_RATE_LIMIT_PER_MIN must be >= 0, got {self.rate_limit_per_min}"
             )
+        if self.hosted and self.rate_limit_per_min < 1:
+            # Dataclass default is 0 (dev unlimited). Hosted constructions that
+            # omit the field still get a real limiter rather than fail-open.
+            self.rate_limit_per_min = DEFAULT_HOSTED_RATE_LIMIT_PER_MIN
         if self.num_predict < 1:
             raise ConfigError(f"GEMMA_CYBER_NUM_PREDICT must be >= 1, got {self.num_predict}")
         if self.log_level not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}:
@@ -227,6 +237,7 @@ class Settings:
             "request_deadline_s": self.request_deadline_s,
             "allow_client_overrides": self.allow_client_overrides,
             "registry_writable": self.registry_writable,
+            "rate_limit_per_min": self.rate_limit_per_min,
         }
 
 
@@ -239,6 +250,23 @@ def load_settings(**overrides: Any) -> Settings:
     """
     environment = _env("ENV", "dev") or "dev"
     hosted = environment in HOSTED_ENVIRONMENTS
+    if hosted:
+        raw_rl = _env("RATE_LIMIT_PER_MIN")
+        if raw_rl is None or raw_rl == "":
+            rate_limit_per_min = DEFAULT_HOSTED_RATE_LIMIT_PER_MIN
+        else:
+            try:
+                rate_limit_per_min = int(raw_rl)
+            except ValueError:
+                raise ConfigError(
+                    f"GEMMA_CYBER_RATE_LIMIT_PER_MIN must be an integer, got {raw_rl!r}"
+                ) from None
+            if rate_limit_per_min < 1:
+                raise ConfigError(
+                    "GEMMA_CYBER_RATE_LIMIT_PER_MIN must be >= 1 in hosted mode"
+                )
+    else:
+        rate_limit_per_min = _env_int("RATE_LIMIT_PER_MIN", 0)
     base = Settings(
         environment=environment,
         ollama_host=_env("OLLAMA_HOST", DEFAULT_OLLAMA_HOST) or DEFAULT_OLLAMA_HOST,
@@ -253,7 +281,7 @@ def load_settings(**overrides: Any) -> Settings:
         registry_path=Path(_env("REGISTRY_PATH", str(DEFAULT_REGISTRY_PATH)) or DEFAULT_REGISTRY_PATH),
         log_level=(_env("LOG_LEVEL", "INFO") or "INFO").upper(),
         api_token=_env("API_TOKEN", "") or "",
-        rate_limit_per_min=_env_int("RATE_LIMIT_PER_MIN", 0),
+        rate_limit_per_min=rate_limit_per_min,
         cors_origins=tuple(
             o.strip() for o in (_env("CORS_ORIGINS", "") or "").split(",") if o.strip()
         ),

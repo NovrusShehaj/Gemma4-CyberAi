@@ -27,8 +27,10 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
 # Install the locked production graph (api extra, no dev tools) into /app/.venv.
-# --frozen: never update the lock; fail if it is out of date.
-RUN uv sync --locked --frozen --no-dev --extra api \
+# --locked: use uv.lock verbatim and fail if it is out of date w.r.t. pyproject
+# (never silently re-resolve). Newer uv rejects --locked together with --frozen,
+# so --locked alone is the assertion we want here.
+RUN uv sync --locked --no-dev --extra api \
  && chown -R app:app /app
 
 ENV PATH="/app/.venv/bin:${PATH}"

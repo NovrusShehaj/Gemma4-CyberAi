@@ -1,0 +1,26 @@
+# Reproducible ML stack for LOCAL Apple-Silicon LoRA training (exp-002r and later).
+#
+# WHY A SEPARATE FILE
+# ------------------
+# requirements-train.txt is the CUDA/cloud stack (torch + bitsandbytes + trl):
+# it does not run on Apple Silicon (no CUDA, no bitsandbytes NF4 path — see the
+# roadmap §12). The local path is `mlx-lm` LoRA. These packages are NOT in
+# pyproject.toml / uv.lock because the API image and the eval harness must stay
+# torch-free; install this only on a training machine.
+#
+# HOW TO USE (Apple Silicon only)
+#   python -m pip install -r configs/training/requirements-train-mlx.txt
+#   python scripts/train_mlx_lora.py -c configs/training/mlx_lora_gemma3_4b_v0.2.yaml
+#
+# KNOWN-GOOD resolved versions from the exp-002r run on an M3 Max (2026-08-27):
+mlx==0.32.2
+mlx-lm==0.31.3
+mlx-metal==0.32.2
+transformers==5.16.1
+tokenizers==0.23.1
+safetensors==0.8.0
+sentencepiece==0.2.2
+protobuf==7.36.0
+numpy==2.5.2
+huggingface_hub==1.29.0
+pyyaml>=6.0

@@ -110,3 +110,28 @@ def test_rollback_from_production(tmp_path):
     reg.promote("m", "production")
     reg.promote("m", "candidate", reason="incident rollback")
     assert reg.get("m").stage == "candidate"
+
+
+def test_fused_sha_roundtrips(tmp_path):
+    sha = "1ea70da8a68526b1abbffb1eff6738319f961550348ee90ecea0bedd497ef702"
+    reg = _reg(tmp_path)
+    reg.register(ModelRecord(version="m", fused_model_sha256=sha))
+    rec = ModelRegistry(tmp_path / "registry.json").get("m")
+    assert rec.fused_model_sha256 == sha
+
+
+def test_committed_registry_honesty():
+    from gemma_cyber.inference.config import DEFAULT_REGISTRY_PATH
+
+    reg = ModelRegistry(DEFAULT_REGISTRY_PATH, read_only=True)
+    base = reg.get("gemma3:4b")
+    v02 = reg.get("gemma3-cyber:v0.2")
+    assert base.stage == "evaluated" and base.passed_eval is False
+    assert v02.stage == "experimental" and v02.passed_eval is False
+    assert v02.fused_model_sha256 == (
+        "1ea70da8a68526b1abbffb1eff6738319f961550348ee90ecea0bedd497ef702"
+    )
+    assert "0.956" in (v02.notes or "")
+    assert "DOES NOT PASS" in (v02.notes or "")
+    assert "T1060" in (v02.notes or "")
+    assert reg.production() is None

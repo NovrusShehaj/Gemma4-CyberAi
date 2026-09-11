@@ -24,8 +24,8 @@ Inherits all `GEMMA_CYBER_*` inference settings (see `docs/cli.md`) plus:
 |---|---|---|
 | `GEMMA_CYBER_API_HOST` | `127.0.0.1` | Bind address (keep localhost behind a proxy) |
 | `GEMMA_CYBER_API_PORT` | `8000` | Bind port |
-| `GEMMA_CYBER_API_TOKEN` | *(empty)* | If set, `/v1/*` requires `Authorization: Bearer <token>` |
-| `GEMMA_CYBER_RATE_LIMIT_PER_MIN` | `0` | Per-identity generate cap; 0 disables |
+| `GEMMA_CYBER_API_TOKEN` | *(empty)* | If set, **generate** requires `Authorization: Bearer <token>`. Does **not** protect `/v1/ready` or `/v1/models` (those stay probe-safe). JWT mode is the hosted path. |
+| `GEMMA_CYBER_RATE_LIMIT_PER_MIN` | `0` dev / `60` hosted | Per-identity generate cap; hosted rejects `0` and non-integers at startup |
 | `GEMMA_CYBER_CORS_ORIGINS` | *(empty)* | Comma-separated exact origins; empty = same-origin only |
 | `GEMMA_CYBER_MAX_CONCURRENT_GENERATIONS` | `4` | Admission bound; saturation → 503 `at_capacity` |
 | `GEMMA_CYBER_REQUEST_DEADLINE_S` | `0` | Total request budget across retries; 0 = per-attempt timeout |
@@ -82,7 +82,8 @@ Response (non-stream):
 
 Streaming (`"stream": true`): `text/event-stream`, one JSON object per SSE `data:`
 line — `{"text": "…"}` chunks, then `{"done": true, "request_id": "…"}`. Errors
-mid-stream arrive as `{"error": "…"}`.
+mid-stream arrive as `{"error": "generation_failed", "request_id": "…"}` (no
+runtime host in the body).
 
 ### Errors
 
@@ -91,10 +92,10 @@ Structured JSON: `{ "error": "<code>", "detail": "…", "request_id": "…" }`.
 | Status | `error` | When |
 |---|---|---|
 | 401 | — | Missing/invalid bearer token (when auth enabled) |
-| 422 | — | Request validation (empty/oversized prompt, bad field) |
+| 422 | `validation_error` | Request validation (empty/oversized prompt, bad field); body does not echo the prompt |
 | 400 | `bad_model` | Requested model is not a released version/alias (hosted policy) |
 | 403 | — | Valid token lacking the required permission (e.g. `admin:models`) |
-| 429 | — | Rate limit exceeded |
+| 429 | — | Rate limit exceeded (`Retry-After` seconds) |
 | 503 | `at_capacity` | At the concurrent-generation bound (`Retry-After: 5`) |
 | 503 | `service_unavailable` / `model_unavailable` | Ollama down / model not pulled |
 | 504 | `timeout` | Generation timed out (per-attempt, or the total request deadline) |
@@ -106,7 +107,8 @@ otherwise a safe id is generated (no log injection / unbounded ids).
 ## Security posture (see `docs/security.md`)
 
 - Security headers on every response (CSP, `X-Frame-Options: DENY`, nosniff, …).
-- Bearer auth and rate limiting are built in, **off by default**, enabled by env.
+- Bearer auth and rate limiting are built in. Rate limiting is **on** in hosted
+  mode (default 60/min) and off in dev unless set.
 - Binds to localhost by default; public exposure expects a TLS-terminating
   reverse proxy (see `docs/deployment.md`). The raw model runtime is never exposed.
 - Input is validated and size-bounded before it reaches the model.

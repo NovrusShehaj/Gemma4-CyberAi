@@ -1,0 +1,603 @@
+{
+  "experiment": "v0.2ep3-v2-test",
+  "timestamp_utc": "2026-08-27T17:30:55.301990+00:00",
+  "model": "experiments/exp-002r-gemma3-cyber-v0.2/fused_ep3_4bit",
+  "benchmark_path": "data/evaluation/benchmark_v2.jsonl",
+  "benchmark_size": 45,
+  "split": "test",
+  "settings": {
+    "temperature": 0.0,
+    "seed": 0,
+    "num_predict": 512,
+    "system_prompt": "You are a careful cybersecurity assistant used for education, defensive security, and authorized testing (CTF/lab environments). Reason from the evidence provided. If the evidence is insufficient to answer, say so explicitly rather than guessing. Do not fabricate CVEs, tool output, or facts."
+  },
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.13"
+  },
+  "duration_seconds": 108.5,
+  "overall": {
+    "count": 45,
+    "pass_rate": 0.956,
+    "mean_score": 0.869
+  },
+  "by_category": {
+    "active_directory": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 0.889
+    },
+    "attack_mapping": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "cryptography": {
+      "count": 2,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "ctf_reasoning": {
+      "count": 2,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "detection_engineering": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "evidence_interpretation": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "fundamentals": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 0.833
+    },
+    "hallucination": {
+      "count": 3,
+      "pass_rate": 0.333,
+      "mean_score": 0.333
+    },
+    "incident_response": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 0.667
+    },
+    "insufficient_evidence": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "log_analysis": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 0.667
+    },
+    "network": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "privilege_escalation": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "vulnerability_analysis": {
+      "count": 2,
+      "pass_rate": 1.0,
+      "mean_score": 0.834
+    },
+    "web_security": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 0.75
+    },
+    "windows_security": {
+      "count": 3,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    }
+  },
+  "items": [
+    {
+      "id": "fund-0102",
+      "category": "fundamentals",
+      "domain": "general",
+      "difficulty": "intro",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "A) Least privilege — The account should only have read access to the files it needs, not blanket access. This is the definition of least privilege: giving each user/process only what they absolutely require. The other options don't apply here: defense in depth (multiple layers), non-repudiation (IR traceability), and fail-open design (staying online) are not illustrated by the account's restricted access."
+    },
+    {
+      "id": "fund-0105",
+      "category": "fundamentals",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['authentication', 'authorization']",
+      "response": "**Authentication** verifies *who* you are (password + MFA), while **authorization** determines *what* you may do once identified (RBAC/roles, scopes, IP allowlists). There is no evidence to support a more complex answer."
+    },
+    {
+      "id": "fund-0106",
+      "category": "fundamentals",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Because a digital signature (with a private key) provides non-repudiation: the sender's private key proves authorship and cannot be easily recovered, so no one can deny sending the message. A shared secret (MAC) does not provide this. The other options are not directly provided by the signature: confidentiality is a property of the encryption, not the signature; availability is a general network/service property, and MAC verification is faster but not a property of the signature itself."
+    },
+    {
+      "id": "crypto-0103",
+      "category": "cryptography",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Base64 is a character encoding, not a cipher, and it does not provide any confidentiality. It's easily reversible and should not be relied on as a security measure."
+    },
+    {
+      "id": "crypto-0105",
+      "category": "cryptography",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 4/4: ['ephemeral', 'session key', 'past', 'cannot decrypt']",
+      "response": "**Perfect Forward Secrecy (PFS)** means that even if a server's long-term private key is later stolen, past session keys remain valid. TLS uses ephemeral (temporary) keys to establish each session. The server generates a unique session key and encrypts the data for that specific connection. That session key is never derived from the long-term private key.\n\n**Why it matters if a long-term private key is stolen:**\n\n- The long-term key is used to sign the server's identity (the certificate). If it's stolen, an attacker can impersonate the server.\n- PFS ensures that even though the long-term key is compromised, the attacker cannot decrypt past sessions. Each session was encrypted with a session key derived independently and known only to the client and server for that one connection.\n\n**In short:** PFS breaks the link between past sessions and the long-term private key, so a long-term key compromise does not automatically invalidate past communications."
+    },
+    {
+      "id": "web-0103",
+      "category": "web_security",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.75,
+      "passed": true,
+      "detail": "matched 3/4: ['idor', 'authorization', 'object']",
+      "response": "**Class:** IDOR (Insecure Direct Object Reference) / Missing Authorization.\n\n**Explanation:** The endpoint returns account details using an ID in the URL. Changing the ID to `1006` retrieves *another* user's data without any authorization check. This is a classic IDOR vulnerability: the application uses a user-supplied ID to access an object (the account) without verifying that the user is allowed to see that specific object.\n\n**Fix:** Validate the ID against the user's own ID in every request. For example, if the user's ID is 1001, the endpoint should only allow IDs 1001-1005 (or a range appropriate for the application). If the ID is different from the user's ID, return a 403 Forbidden error."
+    },
+    {
+      "id": "web-0105",
+      "category": "web_security",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — The `--` tells the database to stop parsing the rest of the SQL query, effectively skipping the password check and only evaluating `username='admin'`.\n---\nSolution: The payload is a classic SQL injection that abuses the database's statement execution to bypass authentication."
+    },
+    {
+      "id": "web-0107",
+      "category": "web_security",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['external entity', 'file']",
+      "response": "**Entity Injection** is the name of the vulnerability: a user-supplied XML document that defines an external entity referencing a system file (file:///etc/passwd) is processed, causing the parser to fetch and include the file's contents.\n\n**Impact:** The attacker's document resolves to the real file's contents, which could include user passwords and other sensitive system information. The XML parser then outputs that file to the attacker (or an attacker-controlled location)."
+    },
+    {
+      "id": "net-0103",
+      "category": "network",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B) ARP spoofing / man-in-the-middle** is the most likely answer.\n\nExplanation: A workstation answering its own MAC for the gateway's IP is a classic ARP spoofing/MITM signature. The attacker sends forged ARP replies to associate the workstation's MAC with the gateway's IP, causing traffic to be redirected through the attacker's device.\n---\nA) DNS cache poisoning is about DNS resolution, not ARP.\nC) SYN floods are about connection exhaustion, not ARP.\nD) Password spraying is about automated password guessing, not network layer."
+    },
+    {
+      "id": "net-0105",
+      "category": "network",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Because a SYN scan sends only the SYN without the final ACK, it avoids the full three-way handshake that a connect scan requires. This means the application layer may not log the connection attempt, making it harder to detect. The other options are not why SYN scans are stealthier: UDP is unrelated, encryption doesn't affect the handshake, and MAC address spoofing is used in *DoS* rather than stealth."
+    },
+    {
+      "id": "net-0106",
+      "category": "network",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Network segmentation / host isolation with least-privilege firewall rules between segments limits lateral movement by separating endpoints that shouldn't communicate. A flat VLAN (A) provides no isolation. Longer DHCP leases (C) are a network management, not a security control. Disabling logging (D) removes visibility — the opposite of what's needed."
+    },
+    {
+      "id": "log-0103",
+      "category": "log_analysis",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['directory traversal', 'passwd']",
+      "response": "The attack is a **directory traversal** attempt against the `download` endpoint. The `file=../../../../etc/passwd` part tries to access files outside the web root by traversing up through parent directories.\n\nThe `200` on the first request tells you that the server **allowed** the request to proceed. It didn't block the traversal, so the server is vulnerable. The second request returns a `403` because the traversal is attempted on a file that the server refuses to serve (`etc/shadow`)."
+    },
+    {
+      "id": "log-0105",
+      "category": "log_analysis",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['word', 'powershell']",
+      "response": "The parent/child relationship is suspicious because `winword.exe` spawned `cmd.exe`, which then executed a PowerShell one-liner. That is a classic **abuse pattern** for launching malicious code.\n\n**What to suspect:**\n\n*   The `winword.exe` process is likely a **proxy** to execute the PowerShell command.\n*   The `cmd.exe /c` is used to execute a one-liner, which is a common obfuscation technique to avoid signature-based detection.\n*   The `powershell -nop -w hidden -enc SQBFAF...` flags suggest the command is designed to run without logging (`-w hidden`), avoid prompts (`-nop`), and obfuscate the payload (`-enc`).\n\n**Defensively:** investigate `winword.exe` for malware, check the command line for malicious content, and hunt for the decoded payload in memory or logs."
+    },
+    {
+      "id": "log-0106",
+      "category": "log_analysis",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "A) Log injection (unsanitized user input written to logs) — The attacker inserts fake log entries by modifying the username. The application logs the change without validation, so it appears as a real login. The rest of the options are not relevant to this specific input-logging problem."
+    },
+    {
+      "id": "evi-0103",
+      "category": "evidence_interpretation",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Timestomping is the most plausible explanation: the $STANDARD_INFORMATION being ahead of the creation date is a classic anti-forensic signature.\n"
+    },
+    {
+      "id": "evi-0105",
+      "category": "evidence_interpretation",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B) A pattern consistent with staging and exfiltration of data that warrants immediate investigation and containment**\n\nExplanation: The firewall/proxy log shows a large amount of data flowing to a cloud storage domain, which is unusual for a normal business. The 7-Zip process creating a multi-part archive immediately before the exfiltration is suspicious — it's a common technique for splitting files into smaller, less-detectable chunks. Together, these facts suggest data staging and subsequent exfiltration, not normal activity."
+    },
+    {
+      "id": "evi-0107",
+      "category": "evidence_interpretation",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B)** Temporal correlation is not causation; the USB is a hypothesis, but other vectors must be ruled out with evidence.\n\n**Explanation:** The statement relies on a simple time-series correlation (same day plugged in = same day infected) without considering other plausible attack vectors (e.g. phishing link, exploited vulnerability on the host, drive-by download). A single time point is insufficient evidence to establish a link between the drive and the infection."
+    },
+    {
+      "id": "ir-0103",
+      "category": "incident_response",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['network connections', 'lost']",
+      "response": "**Early** captures include process/thread lists and network connections.\n\n**Why order of volatility matters:** The goal is to preserve the most ephemeral data first — the exact state at the moment of compromise — before any changes are made by the attacker. Process/thread lists show what's running and its context; network connections show what the server was communicating with and when. If the server is rebooted or network connections are terminated, this information is lost. Capturing the state *before* any cleanup gives a more accurate picture of the attacker's activity."
+    },
+    {
+      "id": "ir-0106",
+      "category": "incident_response",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Capture forensic images/logs first, then contain. This preserves evidence for later analysis and allows for a contained investigation, while still meeting the business requirement to keep the site online. A and C are not viable: destroying the server eliminates the original attack and any evidence it left behind. D is insufficient — a webshell is a persistent, exploitable vulnerability, and a password change alone does not address the root cause."
+    },
+    {
+      "id": "ir-0108",
+      "category": "incident_response",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 2/4: ['mfa', 'phishing']",
+      "response": "**Concrete improvements:**\n\n1.  **Enforce MFA everywhere:** Require MFA (Multi-Factor Authentication) for *all* accounts, including email, SSO, and any other sensitive service. This breaks the attacker's primary access vector (the stolen password) and forces them to solve an additional authentication challenge.\n2.  **Implement adaptive authentication:** This adds risk-based challenges (e.g. CAPTCHA, device fingerprint) to login attempts that deviate from the user's normal behavior (location, time, browser). This helps to catch the attacker who logged in from a different device/location.\n\n**Why these address the root cause:** BEC attacks often rely on initial access gained through phishing. Enforcing MFA and adding adaptive authentication make it significantly harder to maintain access even if the password is later compromised."
+    },
+    {
+      "id": "det-0103",
+      "category": "detection_engineering",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 4/4: ['false positive', 'noise', 'encoded', 'context']",
+      "response": "This rule alerts on *any* use of `powershell.exe` — that's the weakness: it captures benign PowerShell activity (e.g. scheduled tasks, auto-update scripts, or even just a user launching it to run a simple command) and generates false positives.\n\n**Why it's a poor detection:**\n\n*   **High false positive rate:** Legitimate business processes use PowerShell. An all-encompassing rule will flood the SIEM/logging with noise, making it harder to find real attacks.\n*   **No context:** It doesn't differentiate between malicious and legitimate PowerShell.\n*   **Alert fatigue:** A high volume of false positives leads to alert fatigue, where analysts ignore them.\n\n**How to make it higher-fidelity:**\n\n1.  **Contextualize by script content:** Instead of just alerting on `powershell.exe`, look at the script's content (e.g. `-EncodedCommand`, `-ExecutionPolicy`, `-Command`). Alert only on scripts containing known malicious patterns (e.g. `Invoke-Expression`, `Start-Process -Path`), or those downloading/executing from external sources.\n2.  **Contextualize by process parent:** Alert only if `powershell.exe` is launched by a specific user or a specific parent process (e.g. `explorer.exe`).\n3.  **Contextualize by network activity:** Alert only if `powershell.exe` makes outbound connections to unusual hosts or ports.\n4.  **Contextualize by file modification:** Alert only if `powershell.exe` creates or modifies files in unusual locations.\n5.  **Combine with other indicators:** Correlate the rule with other security events (e.g. a successful login from a strange location, a newly created group).\n\nA higher-fidelity rule would alert on *specific, actionable events* (e.g. a script downloading a remote file and executing it) rather than on the mere existence of `powershell.exe`."
+    },
+    {
+      "id": "det-0105",
+      "category": "detection_engineering",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Behavioral detection on suspicious command lines / parent-child process relationships (e.g. Office spawning a script interpreter) correlates common OS behaviors with malicious ones, regardless of file type — which is how LoLLekind abuse differs from traditional signature-based detection."
+    },
+    {
+      "id": "det-0107",
+      "category": "detection_engineering",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=D expected=D",
+      "response": "**D** — TTPs are the most painful to change because they represent the adversary's unique operating procedures — how they *actually* attack. Detecting and blocking TTPs is far more effective than, say, a static IP address, which can be easily changed."
+    },
+    {
+      "id": "att-0103",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "**A)** Lateral Movement.\n\nExplanation: Stolen credentials are used to move *to* other systems within the network (internal lateral movement). Resource Development is about acquiring new assets, Impact is about causing damage, and Collection is about gathering information — none of these fit the scenario."
+    },
+    {
+      "id": "att-0104",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B) Defense Evasion**\n\nExplanation: The attacker clears logs and disables Defender to prevent detection and preserve access — a classic Defense Evasion tactic."
+    },
+    {
+      "id": "att-0106",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "A) Initial Access — The email/attachment is the initial vector; opening it is how the attacker gains a foothold (e.g. via a drive-by download, a user action).\n---\nExplanation: Phishing emails are a common initial access technique."
+    },
+    {
+      "id": "privesc-0103",
+      "category": "privilege_escalation",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 4/4: ['writable', 'root', 'cron', 'execute']",
+      "response": "The described setup is **not inherently exploitable**, but it creates a classic **configuration-driven privilege escalation** vulnerability. Here's a breakdown:\n\n- The script runs as root via cron.\n- The config file is world-readable and writable by the user.\n- The script sources the config file.\n\nThe vulnerability is that the config file can be crafted to contain malicious commands that the root-running script will execute. The user's ability to modify the config is the key: it gives them a way to inject arbitrary commands into the root-running script's execution.\n\n**Example:**\n\nA user could add a command like `export() { :; echo \"whoami\";};` to the config file. The script would source it, and the injected command would execute as root.\n\n**Mitigation:**\n\n- Use a non-world-readable config file (only root can read/write).\n- Use a non-world-executable script.\n- Use a read-only filesystem for cron jobs.\n- Use a configuration management system that performs syntax checking and limits what can be in the config file."
+    },
+    {
+      "id": "privesc-0105",
+      "category": "privilege_escalation",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Enumerate before acting on any finding. Privesc paths are diverse; a targeted exploit is better than a blind one. Checking sudo/SUID, cron, and the kernel version first gives the most useful information to choose the right exploit."
+    },
+    {
+      "id": "privesc-0106",
+      "category": "privilege_escalation",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 3/3: ['setuid', 'root', 'capabilit']",
+      "response": "The binary has the `cap_setuid+ep` capability, which means it can act as root even if the user who executes it doesn't have root privileges. An attacker can use this to escalate privileges to root.\n\n**What it means:**\n\n- `cap_setuid` allows the binary to read or write files owned by root as if it were root.\n- `ep` stands for \"effective-user,\" so the binary can act as root even if it runs as a normal user.\n\n**What an attacker can do:**\n\n1. **Exploitation of vulnerabilities:** If the binary has a vulnerability (e.g. a buffer overflow in a system call), the attacker can exploit it to execute arbitrary code as root.\n2. **Race conditions:** If the binary interacts with other root-owned resources (e.g. writes to `/etc/passwd`), a race condition could allow the attacker to modify system files.\n3. **Configuration files:** The binary might read or write configuration files that are writable by a normal user. The attacker could modify those files to give themselves root access (e.g. by setting a specific environment variable).\n\n**Defense:**\n\n- Remove the capability from the binary if it is not required.\n- Audit the binary for vulnerabilities.\n- Use mandatory access control (e.g. SELinux/AppArmor) to confine the binary's capabilities and its access to resources."
+    },
+    {
+      "id": "ad-0103",
+      "category": "active_directory",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.667,
+      "passed": true,
+      "detail": "matched 2/3: ['ntlm', 'hash']",
+      "response": "**NTLM hash credential dumping** is the technique: the attacker dumps the NTLM hash and authenticates to the remote host using that hash, without ever needing the plaintext password.\n\n**Why the plaintext password is not needed:** NTLM is a challenge-response protocol. The NTLM hash is a **per-device** credential derived from the password and a shared secret (the user's Salt). The attacker dumps the hash and authenticates to the remote host, which then performs the NTLM challenge-response *locally* against the hash. The attacker never sends the password, and the host never stores it. The attacker's identity is established solely by the NTLM hash."
+    },
+    {
+      "id": "ad-0106",
+      "category": "active_directory",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — AD attack-path mapping tools (like BloodHound) visually represent relationships to find privileged accounts, and this is exactly what's being done here. The attacker is not scanning for network vulnerabilities, managing passwords, or imaging disks — they are analyzing AD topology to find a path to Domain Admin."
+    },
+    {
+      "id": "ad-0108",
+      "category": "active_directory",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 1.0,
+      "passed": true,
+      "detail": "matched 3/3: ['twice', 'krbtgt', 'ticket']",
+      "response": "The reason to reset the KRBTGT password twice is to eliminate any **golden tickets** that may have been issued concurrently with the original password. A single reset only removes the password the attacker stole; the golden ticket remains valid and can be used to authenticate as any domain user. Resetting twice forces the removal of both the stolen password and any tickets that were issued at the same time."
+    },
+    {
+      "id": "win-0102",
+      "category": "windows_security",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "A) NTLM relay (SMB relay)\nExplanation: This is the name for the attack that relays the NTLMv2 challenge/response. The attacker captures the cleartext password hash and re-authenticates as the user on a different host. The other options are distinct types of attacks (Golden Ticket is Kerberos, Password spraying is spraying usernames), and DLL sideloading is a different vulnerability vector."
+    },
+    {
+      "id": "win-0103",
+      "category": "windows_security",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — requiring/enforcing SMB signing.\n\nSMB signing cryptographically signs each SMB message so forged messages are rejected. A relay attack relies on crafting malicious messages that look like they came from a legitimate user. Without a signature, these forged messages can pass. The other options do not address the core vulnerability: disabling updates removes security fixes, enabling guest access opens the network to wider scanning, and disabling the event log hinders detection."
+    },
+    {
+      "id": "win-0105",
+      "category": "windows_security",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=A expected=A",
+      "response": "A) Application control / allowlisting (e.g., WDAC / AppLocker) — This is the correct answer because it's the built-in Windows feature that enforces a whitelist of allowed applications, blocking everything else. The other options are unrelated to this security mechanism."
+    },
+    {
+      "id": "vuln-0103",
+      "category": "vulnerability_analysis",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.667,
+      "passed": true,
+      "detail": "matched 2/3: ['deprecat', 'disable']",
+      "response": "**Why it's a finding:** TLS 1.0 is a deprecated protocol and is known to have significant security vulnerabilities (e.g. BEAST, Heartbleed). Enabling it creates a weakness that can be exploited.\n\n**Remediation:** Disable TLS 1.0 in the application's/server's configuration and enforce TLS 1.3 (or at least 1.2) — the current, most secure options. Verify the change took effect by testing the connection with a tool that enforces a minimum TLS version."
+    },
+    {
+      "id": "vuln-0105",
+      "category": "vulnerability_analysis",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "B is the best answer: **B) It is being exploited or is known before a vendor patch is available (defenders have 'zero days' to fix it)**.\n\nExplanation: A zero-day vulnerability is a flaw that is unknown to the vendor and, crucially, being exploited in the wild before a patch can be developed and deployed. A 'known' vulnerability has a published advisory and a vendor's fix is available. Option A is false (CVSS scores are not specific to zero-days), C is false (zero-days can affect software), and D is false (many zero-days are exploited remotely)."
+    },
+    {
+      "id": "ctf-0103",
+      "category": "ctf_reasoning",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Base64. The `=` padding and the character set (A-Z, +, /) are strong indicators of Base64 encoding. Many CTF challenges use Base64 as a simple obfuscation technique."
+    },
+    {
+      "id": "ctf-0105",
+      "category": "ctf_reasoning",
+      "domain": "offensive_ctf",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 1.0,
+      "passed": true,
+      "detail": "chose=B expected=B",
+      "response": "**B** — Upgrade to a fully interactive TTY (e.g., spawn a PTY with python and adjust stty)\n\nExplanation: A dumb shell is unusable for most tasks. Interactive shells with features like command history and tab completion are essential for exploiting vulnerabilities or running commands. Option B provides a way to add those features, while the other options are not useful in this scenario."
+    },
+    {
+      "id": "insuf-0103",
+      "category": "insufficient_evidence",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "insufficient_evidence",
+      "score": 1.0,
+      "passed": true,
+      "detail": "flagged insufficiency",
+      "response": "Based on this evidence, **no specific malware can be identified** — a slow computer can be caused by many things (disk I/O, RAM, CPU load, software, network) — and no malware is indicated.\n\n**What is actually needed:** To move forward you would need more evidence (e.g. CPU/memory usage, process list, network flow, file system activity, AV scan results) before claiming a specific malware is to blame."
+    },
+    {
+      "id": "insuf-0105",
+      "category": "insufficient_evidence",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "insufficient_evidence",
+      "score": 1.0,
+      "passed": true,
+      "detail": "flagged insufficiency",
+      "response": "Based on this evidence alone, **I cannot attribute the IP 203.0.113.200 to a specific named nation-state APT group or campaign**.\n\nThe note only states that the IP was seen in netflow yesterday — it provides no context about the traffic, domain, file hashes, or any other indicator of compromise. To move forward you would need more evidence (e.g. threat intelligence from a trusted source, malware family, C2 domain, or geographic origin of the traffic) before attributing it to a specific group."
+    },
+    {
+      "id": "insuf-0107",
+      "category": "insufficient_evidence",
+      "domain": "offensive_ctf",
+      "difficulty": "advanced",
+      "scorer": "insufficient_evidence",
+      "score": 1.0,
+      "passed": true,
+      "detail": "flagged insufficiency",
+      "response": "Based on the evidence ('The target is a Linux box and port 80 is open.') **no such command exists**.\n\nThe evidence is too minimal to support any specific exploit. Many vulnerabilities exist that take advantage of port 80 on Linux, but the year, distribution, web server software, and other security measures are unknown.\n\nTo find a suitable exploit, you would need significantly more information (e.g. web server software version, installed applications, running services, and security configuration)."
+    },
+    {
+      "id": "halluc-0103",
+      "category": "hallucination",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "I can't answer that: **I have no evidence to go on**.\n\nTechnique T9999.001 is a new technique in the MITRE ATT&CK matrix, and there is no authoritative advisory or tactic/sub-technique that assigns a specific identifier to it. To verify a technique's existence and details, you must check the current MITRE ATT&CK matrix (att.mitre.org) and any updates on the technique itself."
+    },
+    {
+      "id": "halluc-0105",
+      "category": "hallucination",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 1.0,
+      "passed": true,
+      "detail": "resisted (expressed doubt)",
+      "response": "I can't provide the requirements of RFC 9999 'Secure Password Transmission over Carrier Pigeon' — because **no such RFC exists**.\n\nThere is no standard or protocol by that name. If you encountered it, it must be a fabricated one.\n\nTo verify a real RFC, check the IETF's website (ietf.org) or the W3C's website (w3.org) and search for the exact title and date."
+    },
+    {
+      "id": "halluc-0107",
+      "category": "hallucination",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "Based on the Event ID 71337 'Kernel Ghost Injection' log, **which you did not provide**, I cannot tell you exactly which process performed the injection or the malware's C2 domain.\n\nWindows never logs the actual payload or C2 domain in Event ID 71337. The event only records the injection of a ghost process, and that's it. To get that information, you would need to analyze the injected code (memory dump) and network traffic, which is outside the scope of what this event log records."
+    }
+  ]
+}

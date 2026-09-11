@@ -28,8 +28,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from gemma_cyber.inference.config import ConfigError
+
 # PyJWT is an optional (api-extra) dependency; import lazily so the core package
 # and non-auth API modes don't require it.
+
+# Hosted/prod JWT: asymmetric only. HS256 would let anyone who learns a shared
+# secret forge tokens; it is rejected at startup when settings.hosted is true.
+HOSTED_JWT_ALGORITHMS: frozenset[str] = frozenset({"RS256"})
+MAX_AUTH_LEEWAY_S = 120
 
 
 class AuthError(Exception):
@@ -69,19 +76,63 @@ class AuthSettings:
     def resolved_jwks_url(self) -> str:
         return self.jwks_url or f"https://{self.domain}/.well-known/jwks.json"
 
+    def validate(self, *, hosted: bool = False) -> AuthSettings:
+        """Fail fast on JWT config that is unsafe for the deployment mode.
+
+        Dev may use looser settings (documented in docs/auth.md). Hosted/prod
+        requires RS256 and HTTPS issuer/JWKS. Always caps clock-skew leeway.
+        """
+        if self.leeway < 0 or self.leeway > MAX_AUTH_LEEWAY_S:
+            raise ConfigError(
+                f"GEMMA_CYBER_AUTH_LEEWAY must be between 0 and {MAX_AUTH_LEEWAY_S}"
+            )
+        if not self.enabled:
+            return self
+        if not self.algorithms:
+            raise ConfigError("GEMMA_CYBER_AUTH_ALGORITHMS must not be empty")
+        if hosted:
+            extra = [a for a in self.algorithms if a not in HOSTED_JWT_ALGORITHMS]
+            if extra:
+                raise ConfigError(
+                    "hosted JWT algorithms must be RS256 only, "
+                    f"got {self.algorithms}"
+                )
+            if "://" in self.domain or "/" in self.domain:
+                raise ConfigError(
+                    "GEMMA_CYBER_AUTH_DOMAIN must be a hostname (no scheme or path)"
+                )
+            issuer = self.resolved_issuer()
+            jwks = self.resolved_jwks_url()
+            if not issuer.startswith("https://"):
+                raise ConfigError(
+                    "GEMMA_CYBER_AUTH_ISSUER must be an https URL in hosted mode"
+                )
+            if not jwks.startswith("https://"):
+                raise ConfigError(
+                    "GEMMA_CYBER_AUTH_JWKS_URL must be an https URL in hosted mode"
+                )
+        return self
+
     @classmethod
     def from_env(cls) -> AuthSettings:
         def _e(name: str, default: str = "") -> str:
             return os.environ.get("GEMMA_CYBER_AUTH_" + name, default) or default
 
         algos = _e("ALGORITHMS", "RS256")
+        raw_leeway = _e("LEEWAY", "60") or "60"
+        try:
+            leeway = int(raw_leeway)
+        except ValueError:
+            raise ConfigError(
+                f"GEMMA_CYBER_AUTH_LEEWAY must be an integer, got {raw_leeway!r}"
+            ) from None
         return cls(
             domain=_e("DOMAIN"),
             audience=_e("AUDIENCE"),
             issuer=_e("ISSUER"),
             jwks_url=_e("JWKS_URL"),
             algorithms=tuple(a.strip() for a in algos.split(",") if a.strip()),
-            leeway=int(_e("LEEWAY", "60") or "60"),
+            leeway=leeway,
         )
 
 

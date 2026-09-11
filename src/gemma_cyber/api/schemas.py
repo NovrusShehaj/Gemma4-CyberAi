@@ -59,7 +59,6 @@ class HealthResponse(BaseModel):
     service_reachable: bool
     model_present: bool
     model: str
-    host: str
     detail: str = ""
 
 

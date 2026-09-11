@@ -13,7 +13,11 @@ the SAME suite runs against a live server (via ``requests``) or the app in-proce
 Usage (against a live server):
     python scripts/smoke_test.py --base-url http://localhost:8000
     python scripts/smoke_test.py --base-url https://api.example.com --token "$TOKEN"
-    python scripts/smoke_test.py --base-url ... --expect-auth   # assert 401 w/o token
+    python scripts/smoke_test.py --base-url https://api.example.com --token "$TOKEN" --expect-auth
+
+CI runs the same checks in-process (no live Auth0, no TLS). A production go-live
+must run this script against the HTTPS hostname with --expect-auth and a real
+token; that operator transcript is evidence for QA-001, not the unit suite.
 
 Exit code 0 = all required checks passed; 1 = a required check failed.
 """
@@ -21,6 +25,7 @@ Exit code 0 = all required checks passed; 1 = a required check failed.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -80,6 +85,14 @@ def run_smoke(
     check("readiness reachable", r.status_code in (200, 503), f"got {r.status_code}")
     check("readiness == 200 (model available)", r.status_code == 200,
           f"got {r.status_code}", required=False)
+    try:
+        body = r.json()
+        blob = json.dumps(body)
+        check("readiness has no host field", "host" not in body)
+        check("readiness body has no URL", "://" not in blob)
+    except Exception as exc:  # noqa: BLE001
+        check("readiness has no host field", False, str(exc))
+        check("readiness body has no URL", False, str(exc))
 
     # 4. Model listing
     r = client.get("/v1/models")
@@ -99,6 +112,8 @@ def run_smoke(
     if expect_auth:
         r = client.post("/v1/generate", json={"prompt": "hi"})
         check("unauthenticated generate -> 401", r.status_code == 401, f"got {r.status_code}")
+        r = client.post("/v1/admin/models/register", json={"version": "x"})
+        check("unauthenticated admin -> 401", r.status_code == 401, f"got {r.status_code}")
 
     # 7. Happy-path generate (requires a token if auth is on; skip if none and expect_auth)
     if token or not expect_auth:

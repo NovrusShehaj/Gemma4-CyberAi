@@ -3,9 +3,11 @@
 All are safe-by-default and dependency-free (no Redis, no external service):
   * Bearer-token auth is OFF unless ``GEMMA_CYBER_API_TOKEN`` is set. When set,
     it is compared in constant time.
-  * The rate limiter is an in-process token bucket keyed by client. It is OFF
-    (limit 0) by default and intended for a single-instance deployment; a
-    multi-instance deployment would move this to a shared store.
+  * The rate limiter is an in-process fixed window keyed by client. It is OFF
+    (limit 0) in dev and ON in hosted mode (default 60/min). Intended for a
+    single-instance deployment; a multi-instance deployment would move this to a
+    shared store. Unauthenticated 401 storms are not limited here — the edge
+    proxy (deploy/nginx.reference.conf ``limit_req``) must cap them.
   * Security headers + a strict CSP are always applied.
 
 These implement the Phase 9 controls that belong at the transport edge; model
@@ -102,6 +104,16 @@ class RateLimiter:
         hits.append(now)
         self._hits[key] = hits
         return True
+
+    def retry_after_s(self, key: str) -> int:
+        """Seconds until the oldest hit in the current window expires (ceil)."""
+        now = self._now()
+        window_start = now - 60.0
+        hits = [t for t in self._hits.get(key, []) if t >= window_start]
+        if not hits:
+            return 1
+        remaining = 60.0 - (now - min(hits))
+        return max(1, int(remaining + 0.999))
 
 
 def content_security_policy(auth0_domain: str = "") -> str:

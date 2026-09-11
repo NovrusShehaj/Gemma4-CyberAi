@@ -138,6 +138,13 @@ def test_app_js_does_not_persist_tokens():
     assert "setitem(pkce_key" in lowered.replace(" ", "") or "setItem(PKCE_KEY" in js
 
 
+def test_app_js_polls_health_and_backs_off_ready():
+    js = (WEB / "app.js").read_text()
+    assert 'fetch("/health")' in js
+    assert "setInterval(refreshLiveness, 15000)" in js
+    assert "setInterval(refreshStatus, 60000)" in js
+
+
 def test_index_uses_external_stylesheet_and_script():
     html = (WEB / "index.html").read_text()
     assert '<link rel="stylesheet" href="/styles.css"' in html

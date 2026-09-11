@@ -91,6 +91,27 @@ def test_hosted_defaults_are_locked_down(monkeypatch):
     assert s.hosted is True
     assert s.allow_client_overrides is False  # server owns system prompt + models
     assert s.registry_writable is False       # GitOps read-only by default
+    assert s.rate_limit_per_min == 60         # limiter on unless explicitly set
+
+
+def test_hosted_zero_rate_limit_rejected(monkeypatch):
+    for k in list(dict(**__import__("os").environ)):
+        if k.startswith("GEMMA_CYBER_"):
+            monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GEMMA_CYBER_ENV", "prod")
+    monkeypatch.setenv("GEMMA_CYBER_RATE_LIMIT_PER_MIN", "0")
+    with pytest.raises(ConfigError, match="RATE_LIMIT"):
+        load_settings()
+
+
+def test_hosted_garbage_rate_limit_rejected(monkeypatch):
+    for k in list(dict(**__import__("os").environ)):
+        if k.startswith("GEMMA_CYBER_"):
+            monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GEMMA_CYBER_ENV", "staging")
+    monkeypatch.setenv("GEMMA_CYBER_RATE_LIMIT_PER_MIN", "abc")
+    with pytest.raises(ConfigError, match="integer"):
+        load_settings()
 
 
 def test_dev_defaults_are_permissive(monkeypatch):
@@ -101,6 +122,7 @@ def test_dev_defaults_are_permissive(monkeypatch):
     assert s.hosted is False
     assert s.allow_client_overrides is True
     assert s.registry_writable is True
+    assert s.rate_limit_per_min == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -216,3 +238,22 @@ def test_docs_hidden_in_hosted_mode():
 def test_docs_available_in_dev():
     client = TestClient(_app(Settings(environment="dev")))
     assert client.get("/openapi.json").status_code == 200
+
+
+def test_hosted_admin_without_auth_is_401(tmp_path):
+    path = tmp_path / "r.json"
+    ModelRegistry(path).register(ModelRecord(version="m"))
+    client = TestClient(_app(
+        Settings(environment="staging", registry_writable=False),
+        registry=ModelRegistry(path, read_only=True),
+    ))
+    r = client.post("/v1/admin/models/register", json={"version": "n"})
+    assert r.status_code == 401
+
+
+def test_hosted_writable_without_auth_refuses_to_start():
+    with pytest.raises(RuntimeError, match="writable registry"):
+        create_app(
+            Settings(environment="staging", registry_writable=True),
+            engine=cast(InferenceEngine, RecordingEngine()),
+        )

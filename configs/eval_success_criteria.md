@@ -6,6 +6,11 @@
 > Thresholds here are **frozen**. They may change only by writing a new, dated version of
 > this file with an explicit rationale — never silently after seeing an experiment's
 > numbers.
+>
+> **Current measured status (does not change these thresholds):** exp-002r
+> (2026-08-27) **DID NOT PASS**. See
+> `experiments/exp-002r-gemma3-cyber-v0.2/RESULTS.md` and `docs/model-card.md`.
+> The freeze-date sentence below is historical (2026-08-24).
 
 This is an **evaluation-infrastructure** artifact. **No training has occurred.** Nothing
 here claims the model has improved; it defines how we will decide *whether* it did. The

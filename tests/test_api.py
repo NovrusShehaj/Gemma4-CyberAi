@@ -44,6 +44,8 @@ class FakeEngine:
                                 system=kw.get("system"), options={})
 
     def stream(self, prompt, **kw):
+        if self._raise:
+            raise self._raise
         for piece in ("fa", "ke"):
             yield StreamChunk(request_id="rid", text=piece)
         yield StreamChunk(request_id="rid", text="", done=True)
@@ -65,11 +67,30 @@ def test_health_liveness():
 def test_ready_ok():
     r = _client(engine=FakeEngine(ok=True)).get("/v1/ready")
     assert r.status_code == 200 and r.json()["ok"] is True
+    assert "host" not in r.json()
+    assert "://" not in r.text
 
 
 def test_ready_not_ok_returns_503():
     r = _client(engine=FakeEngine(ok=False)).get("/v1/ready")
     assert r.status_code == 503 and r.json()["ok"] is False
+    assert "host" not in r.json()
+
+
+def test_ready_caches_health_calls():
+    eng = FakeEngine(ok=True)
+    calls = {"n": 0}
+    orig = eng.health
+
+    def counted():
+        calls["n"] += 1
+        return orig()
+
+    eng.health = counted  # type: ignore[method-assign]
+    client = _client(engine=eng)
+    assert client.get("/v1/ready").status_code == 200
+    assert client.get("/v1/ready").status_code == 200
+    assert calls["n"] == 1
 
 
 def test_generate_json():
@@ -100,10 +121,35 @@ def test_generate_validation_rejects_oversized_prompt():
 
 
 def test_generate_service_unavailable_maps_503():
-    eng = FakeEngine(raise_exc=ServiceUnavailableError("ollama down"))
+    eng = FakeEngine(raise_exc=ServiceUnavailableError(
+        "connection to http://ollama:11434 failed"
+    ))
     r = _client(engine=eng).post("/v1/generate", json={"prompt": "hi"})
     assert r.status_code == 503
-    assert r.json()["error"] == "service_unavailable"
+    body = r.json()
+    assert body["error"] == "service_unavailable"
+    assert body["request_id"]
+    assert "http://" not in r.text
+    assert "ollama:11434" not in r.text
+
+
+def test_stream_error_does_not_leak_runtime():
+    eng = FakeEngine(raise_exc=ServiceUnavailableError(
+        "connection to http://ollama:11434 failed"
+    ))
+    r = _client(engine=eng).post("/v1/generate", json={"prompt": "hi", "stream": True})
+    assert r.status_code == 200
+    assert "generation_failed" in r.text
+    assert "ollama:11434" not in r.text
+    assert "http://" not in r.text
+
+
+def test_validation_error_omits_prompt_input():
+    marker = "secret-prompt-xyz"
+    r = _client().post("/v1/generate", json={"prompt": marker * 2000})
+    assert r.status_code == 422
+    assert marker not in r.text
+    assert r.json()["error"] == "validation_error"
 
 
 def test_stream_sse():
@@ -131,7 +177,10 @@ def test_rate_limit():
     client = _client(settings=settings)
     assert client.post("/v1/generate", json={"prompt": "1"}).status_code == 200
     assert client.post("/v1/generate", json={"prompt": "2"}).status_code == 200
-    assert client.post("/v1/generate", json={"prompt": "3"}).status_code == 429
+    r = client.post("/v1/generate", json={"prompt": "3"})
+    assert r.status_code == 429
+    assert r.headers.get("Retry-After")
+    assert int(r.headers["Retry-After"]) >= 1
 
 
 def test_models_endpoint(tmp_path):

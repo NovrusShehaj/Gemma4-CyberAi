@@ -249,7 +249,23 @@ function addRequestId(card, rid) {
 }
 
 // --- Status polling -------------------------------------------------------
+async function refreshLiveness() {
+  try {
+    const r = await fetch("/health");
+    if (!r.ok) {
+      setStatus("bad", "unreachable");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    setStatus("bad", "unreachable");
+    return false;
+  }
+}
+
 async function refreshStatus() {
+  const up = await refreshLiveness();
+  if (!up) return;
   try {
     const r = await fetch("/v1/ready");
     const j = await r.json();
@@ -444,7 +460,8 @@ async function boot() {
 
   render();
   refreshStatus();
-  setInterval(refreshStatus, 15000);
+  setInterval(refreshLiveness, 15000);
+  setInterval(refreshStatus, 60000);
 }
 
 boot();

@@ -102,6 +102,42 @@ jobs:
           /tmp/clean/bin/gemma-cyber version
           /tmp/clean/bin/python -c "from gemma_cyber.api.app import create_app; print('import ok')"
 
+      - name: A base install must NOT enable the agent
+        # Installing gemma-cyber without [agent] gives a `gemma4` binary that
+        # explains how to install the extra and exits non-zero. Tool execution
+        # must never appear as a side effect of installing the library.
+        run: |
+          python -m venv /tmp/base
+          /tmp/base/bin/pip install --upgrade pip
+          /tmp/base/bin/pip install "$(ls dist/*.whl)"
+          if /tmp/base/bin/gemma4 --help; then
+            echo "FAIL: gemma4 ran without the [agent] extra"; exit 1
+          fi
+          /tmp/base/bin/gemma4 --help 2>&1 | grep -q "agent" \
+            || { echo "FAIL: no actionable message about the [agent] extra"; exit 1; }
+          ! /tmp/base/bin/python -c "import typer" 2>/dev/null \
+            || { echo "FAIL: base install pulled in agent dependencies"; exit 1; }
+
+      - name: Clean-install with the agent extra and smoke gemma4
+        run: |
+          python -m venv /tmp/agent
+          /tmp/agent/bin/pip install --upgrade pip
+          /tmp/agent/bin/pip install "$(ls dist/*.whl)[agent]"
+          /tmp/agent/bin/gemma4 --version
+          /tmp/agent/bin/gemma4 --help > /dev/null
+          # Default mode must be read-only: write/shell tools hidden out of the box.
+          /tmp/agent/bin/gemma4 tools | tee /tmp/tools.txt
+          grep -q "hidden in read-only" /tmp/tools.txt \
+            || { echo "FAIL: default install is not read-only"; exit 1; }
+          # ...and the hosted API still imports none of it.
+          /tmp/agent/bin/python - <<'PY'
+          import sys
+          from gemma_cyber.api.app import create_app  # noqa: F401
+          leaked = [n for n in sys.modules if n.startswith("gemma_cyber.agent")]
+          assert not leaked, f"API pulled in agent modules: {leaked}"
+          print("import boundary holds in a clean install")
+          PY
+
   container:
     # Build the API image and verify it (a) builds from the locked deps and
     # (b) fail-closes: ENV=prod with no auth configured must refuse to start.

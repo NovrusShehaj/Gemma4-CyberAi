@@ -10,6 +10,17 @@ the first run and how the pipeline was hardened against them.
 > evaluation was run**. Model improvement is therefore **UNPROVEN** — only
 > training loss exists, and training loss is not evidence of model quality. See
 > `docs/experiments/exp-002.md` §8 and `docs/training/cyber_ai_colab_results.md`.
+>
+> **UPDATE — exp-002r (2026-08-27):** the run was reproduced **locally** on Apple
+> Silicon via `mlx-lm` LoRA (no Colab), artifacts persisted, and **both arms were
+> evaluated**. Result: **DOES NOT PASS** the pre-registered bar — the v2
+> do-no-harm guard holds but every targeted benchmark_v3 objective fails (277
+> examples × 3 epochs did not teach exact ATT&CK IDs; the Kerberoasting→T1060
+> hallucination survives). Full analysis + exp-003 plan:
+> `experiments/exp-002r-gemma3-cyber-v0.2/RESULTS.md`. Local path:
+> `scripts/train_mlx_lora.py` + `configs/training/mlx_lora_gemma3_4b_v0.2.yaml` +
+> `configs/training/requirements-train-mlx.txt`; evaluate a fused MLX model with
+> `scripts/run_baseline_mlx.py`.
 
 ---
 

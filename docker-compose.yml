@@ -6,8 +6,10 @@
 #   open http://localhost:8000/
 #
 # This is a SINGLE-HOST deployment (the documented target). For public exposure,
-# put a TLS-terminating reverse proxy in front of the `api` service and set
-# GEMMA_CYBER_API_TOKEN + GEMMA_CYBER_RATE_LIMIT_PER_MIN (see docs/deployment.md).
+# use the production overlay (auth required, rate limit on) and a TLS-terminating
+# reverse proxy:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# See docs/deployment.md and deploy/TLS-CHECKLIST.md.
 
 services:
   ollama:

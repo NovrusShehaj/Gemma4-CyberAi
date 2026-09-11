@@ -1,0 +1,6 @@
+a3f3b407a8dfcf7731dcf3d185dc9f9d6f455c5061a93e0827e3b1a8b9f531d3  experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000061_adapters.safetensors
+3a1168bde0a50b6616eb996528626c62d8a6a0e14544fb35521f77bbfa37077a  experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000122_adapters.safetensors
+34e39c7bc27c8ff61e5db342afa0c1e00a5ca0f9f1aab8f15271dbac7d293539  experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000183_adapters.safetensors
+34e39c7bc27c8ff61e5db342afa0c1e00a5ca0f9f1aab8f15271dbac7d293539  experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/adapters.safetensors
+382b4b7bf435d8f592a4bd6e3ab27a7e6e885917b8d953638013db8d2f8c7616  experiments/exp-002r-gemma3-cyber-v0.2/fused_ep2_4bit/model.safetensors
+1ea70da8a68526b1abbffb1eff6738319f961550348ee90ecea0bedd497ef702  experiments/exp-002r-gemma3-cyber-v0.2/fused_ep3_4bit/model.safetensors

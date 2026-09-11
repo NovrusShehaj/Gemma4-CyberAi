@@ -1,0 +1,29 @@
+Trainable parameters: 0.308% (14.025M/4551.516M)
+Starting training..., iters: 183
+Iter 1: Val loss 5.019, Val took 37.178s
+Iter 10: Train loss 3.952, Learning Rate 1.801e-04, It/sec 0.165, Tokens/sec 70.576, Trained Tokens 4276, Peak mem 12.024 GB
+Iter 20: Train loss 2.255, Learning Rate 1.991e-04, It/sec 0.165, Tokens/sec 72.980, Trained Tokens 8692, Peak mem 17.691 GB
+Iter 30: Train loss 2.515, Learning Rate 1.955e-04, It/sec 0.222, Tokens/sec 96.397, Trained Tokens 13025, Peak mem 17.691 GB
+Iter 40: Train loss 2.049, Learning Rate 1.892e-04, It/sec 0.242, Tokens/sec 110.211, Trained Tokens 17580, Peak mem 17.691 GB
+Iter 50: Train loss 2.017, Learning Rate 1.805e-04, It/sec 0.296, Tokens/sec 128.881, Trained Tokens 21936, Peak mem 17.691 GB
+Iter 60: Train loss 1.543, Learning Rate 1.695e-04, It/sec 0.420, Tokens/sec 178.897, Trained Tokens 26191, Peak mem 17.691 GB
+Iter 61: Val loss 1.166, Val took 10.970s
+Iter 61: Saved adapter weights to experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/adapters.safetensors and experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000061_adapters.safetensors.
+Iter 70: Train loss 1.342, Learning Rate 1.567e-04, It/sec 0.401, Tokens/sec 161.513, Trained Tokens 30221, Peak mem 17.691 GB
+Iter 80: Train loss 1.051, Learning Rate 1.423e-04, It/sec 0.415, Tokens/sec 156.932, Trained Tokens 34003, Peak mem 17.691 GB
+Iter 90: Train loss 1.127, Learning Rate 1.268e-04, It/sec 0.330, Tokens/sec 146.912, Trained Tokens 38459, Peak mem 17.691 GB
+Iter 100: Train loss 0.641, Learning Rate 1.107e-04, It/sec 0.395, Tokens/sec 173.543, Trained Tokens 42855, Peak mem 17.691 GB
+Iter 110: Train loss 1.007, Learning Rate 9.442e-05, It/sec 0.400, Tokens/sec 185.467, Trained Tokens 47489, Peak mem 17.691 GB
+Iter 120: Train loss 1.039, Learning Rate 7.845e-05, It/sec 0.406, Tokens/sec 198.422, Trained Tokens 52382, Peak mem 17.747 GB
+Iter 122: Val loss 1.048, Val took 8.923s
+Iter 122: Saved adapter weights to experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/adapters.safetensors and experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000122_adapters.safetensors.
+Iter 130: Train loss 0.345, Learning Rate 6.326e-05, It/sec 0.463, Tokens/sec 188.689, Trained Tokens 56458, Peak mem 17.747 GB
+Iter 140: Train loss 0.399, Learning Rate 4.929e-05, It/sec 0.336, Tokens/sec 151.419, Trained Tokens 60962, Peak mem 17.747 GB
+Iter 150: Train loss 0.209, Learning Rate 3.697e-05, It/sec 0.298, Tokens/sec 129.777, Trained Tokens 65319, Peak mem 17.747 GB
+Iter 160: Train loss 0.470, Learning Rate 2.664e-05, It/sec 0.234, Tokens/sec 120.255, Trained Tokens 70457, Peak mem 17.748 GB
+Iter 170: Train loss 0.408, Learning Rate 1.862e-05, It/sec 0.335, Tokens/sec 146.159, Trained Tokens 74821, Peak mem 17.748 GB
+Iter 180: Train loss 0.315, Learning Rate 1.313e-05, It/sec 0.266, Tokens/sec 99.700, Trained Tokens 78573, Peak mem 17.748 GB
+Iter 183: Val loss 1.222, Val took 14.739s
+Iter 183: Train loss 0.276, Learning Rate 1.201e-05, It/sec 0.785, Tokens/sec 128.375, Trained Tokens 80209, Peak mem 17.748 GB
+Iter 183: Saved adapter weights to experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/adapters.safetensors and experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters/0000183_adapters.safetensors.
+DONE. Fused model: /Users/novrusshehaj/Github/Gemma4-CyberAi/experiments/exp-002r-gemma3-cyber-v0.2/fused_model

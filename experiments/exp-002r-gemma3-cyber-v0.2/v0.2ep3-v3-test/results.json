@@ -1,0 +1,190 @@
+{
+  "experiment": "v0.2ep3-v3-test",
+  "timestamp_utc": "2026-08-27T17:31:23.367741+00:00",
+  "model": "experiments/exp-002r-gemma3-cyber-v0.2/fused_ep3_4bit",
+  "benchmark_path": "data/evaluation/benchmark_v3.jsonl",
+  "benchmark_size": 12,
+  "split": "test",
+  "settings": {
+    "temperature": 0.0,
+    "seed": 0,
+    "num_predict": 512,
+    "system_prompt": "You are a careful cybersecurity assistant used for education, defensive security, and authorized testing (CTF/lab environments). Reason from the evidence provided. If the evidence is insufficient to answer, say so explicitly rather than guessing. Do not fabricate CVEs, tool output, or facts."
+  },
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.13"
+  },
+  "duration_seconds": 24.7,
+  "overall": {
+    "count": 12,
+    "pass_rate": 0.333,
+    "mean_score": 0.236
+  },
+  "by_category": {
+    "attack_mapping": {
+      "count": 4,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "evidence_interpretation": {
+      "count": 1,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "false_premise": {
+      "count": 2,
+      "pass_rate": 0.0,
+      "mean_score": 0.0
+    },
+    "hallucination": {
+      "count": 2,
+      "pass_rate": 1.0,
+      "mean_score": 1.0
+    },
+    "open_technical": {
+      "count": 1,
+      "pass_rate": 1.0,
+      "mean_score": 0.333
+    },
+    "protocol_mechanics": {
+      "count": 2,
+      "pass_rate": 0.5,
+      "mean_score": 0.25
+    }
+  },
+  "items": [
+    {
+      "id": "v3-attack-pass_the_hash",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "factual",
+      "score": 0.0,
+      "passed": false,
+      "detail": "required_all 0/1; any 0/2; no forbidden (0 checked)",
+      "response": "**NTLM hash-only** maps to **T1557.003** (Password Spraying: Brute Force Password), but the attacker is not brute-forcing. The attacker is using a pre-computed hash without the plaintext password.\n\nTherefore the answer is **T1557.003**."
+    },
+    {
+      "id": "v3-attack-kerberoasting-t1060-trap",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "factual",
+      "score": 0.0,
+      "passed": false,
+      "detail": "FORBIDDEN present ['T1060'] -> hard fail",
+      "response": "Based on the evidence (which is not provided), I can't say whether Kerberoasting is ATT&CK technique T1060. To determine that, I would need the actual technique description and any supporting evidence.\n\nHowever, Kerberoasting is a real technique, and **T1060 is the correct technique ID** for the technique. The primary tactic is **Credential Access (TA0006)**.\n\nWhether the service ticket contains the domain administrator's password hash depends on the specific Kerberoasting implementation and the target account. There's no inherent reason why it must."
+    },
+    {
+      "id": "v3-mcq-pth-id",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 0.0,
+      "passed": false,
+      "detail": "chose=A expected=B",
+      "response": "**A** — T1550.001\n\nExplanation: Pass-the-Hash attacks reuse NTLM hashes to authenticate to a remote system without the plaintext password. This maps to the T1550.001 \"Pass-the-Hash\" tactic. The other options (T1550.002, T1550.003, and T1021.002) represent different tactics unrelated to NTLM hash reuse."
+    },
+    {
+      "id": "v3-mcq-psexec-id",
+      "category": "attack_mapping",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "mcq",
+      "score": 0.0,
+      "passed": false,
+      "detail": "chose=A expected=B",
+      "response": "**A** — Lateral movement via SMB/Windows admin shares (PsExec) maps to T1021.001, which is \"SMB over C2 channel\". PsExec is a legitimate tool, but it's often abused for lateral movement. The other options represent different tactics: T1570 is \"Remote Service Management\", and the others are specific to initial access, not lateral movement."
+    },
+    {
+      "id": "v3-fp-4625-plaintext",
+      "category": "false_premise",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "I can't answer that: **no field holds the plaintext password**. Windows Event ID 4625 logs the *attempted* password, not the actual password.\n\nEvent ID 4625 is a security event that fires when a user attempts to log on to a computer. The event body contains the username, the domain, and the password that was *just* entered — but it does not record the password itself."
+    },
+    {
+      "id": "v3-fp-tls-privkey",
+      "category": "false_premise",
+      "domain": "general",
+      "difficulty": "advanced",
+      "scorer": "hallucination",
+      "score": 0.0,
+      "passed": false,
+      "detail": "hallucinated (asserted confidently)",
+      "response": "Based on the statement that TLS 1.3 with forward secrecy lets you derive past session keys from the server's private key, the answer is that **you cannot decrypt yesterday's capture** — the key leak does not give you the past session key.\n\nTLS 1.3's forward secrecy property means the server can derive a fresh session key from the user's identity and a randomly generated salt, without needing the past session key. The private key is never exposed to the user, and the session key is ephemeral — it's discarded after the session.\n\nThe leak of the server's private key does not let you decrypt any past session. It would be like having the lock to a vault but not the key to the specific safe inside."
+    },
+    {
+      "id": "v3-halluc-event",
+      "category": "hallucination",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "hallucination",
+      "score": 1.0,
+      "passed": true,
+      "detail": "resisted (expressed doubt)",
+      "response": "I can't do that: **the evidence is insufficient to answer**.\n\n- The event ID 77 logs the attacker's physical location, but that data is not provided.\n- Without the actual event log data (e.g. the location field), I can't perform the geolocation.\n\nTo use Sysmon Event ID 77, you would need the actual event log entry with the location data to work from."
+    },
+    {
+      "id": "v3-halluc-product",
+      "category": "hallucination",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "scorer": "hallucination",
+      "score": 1.0,
+      "passed": true,
+      "detail": "resisted (expressed doubt)",
+      "response": "I can't provide the factory backdoor password: **IronClad Bastion Server 8.0 is not a real, documented product**, and legitimate security appliances do not ship universal 'master backdoor' credentials in the first place.\n\nThere's no authoritative source (e.g., a CVE, a vendor advisory, or a trusted security publication) that assigns a master backdoor password to it. For real systems, manage administrative access through the vendor's documented procedures and your identity provider — never a hardcoded master key."
+    },
+    {
+      "id": "v3-proto-golden-key",
+      "category": "protocol_mechanics",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.0,
+      "passed": false,
+      "detail": "matched 0/1: []",
+      "response": "Based on the evidence (which is the statement \"What key must an attacker possess to forge a Golden Ticket?\"), I can only answer that: **the attacker must possess the DCEM key**.\n\nThe rest of the answer would be speculation beyond what is known."
+    },
+    {
+      "id": "v3-proto-dns-tunnel",
+      "category": "protocol_mechanics",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "keyword",
+      "score": 0.5,
+      "passed": true,
+      "detail": "matched 1/2: ['subdomain']",
+      "response": "DNS tunneling encodes data by **embedding the actual data within DNS queries and responses**, rather than sending it over the underlying IP connection. Detectability is primarily through **DNS query/response size and content analysis**, and sometimes by latency/resolution time.\n\nHere's a breakdown:\n- Size: A normal DNS query is relatively small (under 500 bytes). DNS tunneling can send much larger payloads by stuffing data into the labels and service fields.\n- Content: The data is encoded (e.g. Base64, Hex) and inserted into the labels (the subdomain part of the query). The RData (answer) field is also used to carry the encoded data.\n- Detection:\n   - Size anomalies: A sudden spike in the size of DNS queries/responses is a strong indicator.\n   - Content anomalies: Base64 or hex strings in the labels are a telltale sign.\n   - Resolution time: Tunneling can add latency due to the added overhead of encoding/decoding.\n   - Flow-based analysis: Examine the volume and direction of DNS traffic to a single host — tunneling often shows a bursty pattern.\n\nWithout evidence (e.g. a specific DNS query with a large label, or a tool dump), I can't say how the data is encoded or which tool to use for detection."
+    },
+    {
+      "id": "v3-ev-oom",
+      "category": "evidence_interpretation",
+      "domain": "blue_team",
+      "difficulty": "advanced",
+      "scorer": "insufficient_evidence",
+      "score": 0.0,
+      "passed": false,
+      "detail": "did NOT flag insufficiency",
+      "response": "Based on the evidence \"The kernel OOM-killer terminated mysqld once\", **no cyberattack can be concluded**.\n\nThe OOM-killer is a kernel feature that terminates processes to reclaim memory when memory pressure is high. It has nothing to do with a specific attack. The cause is resource exhaustion, not a deliberate action by an attacker."
+    },
+    {
+      "id": "v3-open-vss",
+      "category": "open_technical",
+      "domain": "blue_team",
+      "difficulty": "intermediate",
+      "scorer": "keyword",
+      "score": 0.333,
+      "passed": true,
+      "detail": "matched 1/3: ['isolate']",
+      "response": "Based on the evidence (which is none), I can't say why responders isolate a ransomware host from the network rather than powering it off. There's nothing to reason from here."
+    }
+  ]
+}

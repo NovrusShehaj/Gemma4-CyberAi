@@ -82,22 +82,48 @@ audit trail in git indefinitely.
 ## Operational smoke test
 
 `scripts/smoke_test.py` validates a running deployment end to end: liveness,
-readiness, security headers, model listing, input validation, the generate path,
-and — with `--expect-auth` — that auth is enforced.
+readiness (no runtime URL in the body), security headers, model listing, input
+validation, the generate path, and — with `--expect-auth` — that unauthenticated
+generate **and** admin calls are 401.
 
 ```bash
 python scripts/smoke_test.py --base-url http://localhost:8000
 python scripts/smoke_test.py --base-url https://api.example.com --token "$TOKEN" --expect-auth
 ```
 Exit 0 = all required checks passed. Run it after every deploy and after a
-rollback. The same checks run in CI in-process (`tests/test_operational_smoke.py`,
-open + auth-enforced modes) so regressions are caught without a live server.
+rollback.
+
+**QA-001 live evidence:** CI runs the same function in-process
+(`tests/test_operational_smoke.py`) — that is **not** a live Auth0 or TLS test.
+A go-live requires the HTTPS command above against the real hostname, with a
+real token, after AUTH-001 and the prod Compose overlay. Keep the transcript
+off-repo if it names the tenant.
 
 ## Rollback drill
 
-Rollback is a registry promotion (model) or an image-tag redeploy (code). Test it
-in staging before you need it in production:
+Hosted GitOps: revert `data/models/registry.json` and redeploy. There is **no**
+`production` registry alias today (MODEL-GATE not met). Code rollback is an
+image-tag redeploy.
+
 ```bash
-gemma-cyber models promote gemma3:4b --to production   # if a prior prod exists
-docker compose up -d api                                # picks up GEMMA_CYBER_MODEL=production
+# GitOps registry rollback
+git revert <registry-commit> && docker compose up -d --build api
+# Code rollback
+docker compose up -d api   # previous immutable image tag
 ```
+
+## Disaster recovery — registry + Ollama volume
+
+Durable state is the JSON registry and the Compose volume `ollama-models`. There
+is no database.
+
+```bash
+python scripts/restore_drill.py backup --dest ./backups/registry.json
+python scripts/restore_drill.py volume-commands   # print docker tar commands
+python scripts/restore_drill.py restore --src ./backups/registry.json
+```
+
+On a clean compose project: restore `registry.json` into `data/models/`, restore
+the volume tarball, `docker compose up -d`, then `curl -sS http://127.0.0.1:8000/v1/models`
+must list the same versions as the backup. RPO = last copy; RTO = restore +
+restart (hours-scale, not a contracted SLA).

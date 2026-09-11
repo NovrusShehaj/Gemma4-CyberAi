@@ -9,8 +9,11 @@ The API's trust boundary. Three modes, chosen by configuration:
 | **open (dev)** | neither set | Anonymous (local development only) |
 
 **Production fails closed:** with `GEMMA_CYBER_ENV=prod` and no auth configured,
-the app **refuses to start**. This prevents an accidentally-public unauthenticated
-API. Static-token mode in prod logs a warning recommending Auth0.
+the app **refuses to start**. Hosted environments (`staging`/`prod`) also refuse
+to start with a **writable** registry and no auth, and `require_scopes` never
+fail-opens: missing auth on admin routes is **401**, not anonymous allow. Open
+mode remains **dev-only**. Static-token mode in prod logs a warning recommending
+Auth0.
 
 ## What is validated (JWT mode)
 
@@ -50,8 +53,8 @@ dev token carries no scopes, so it can chat but never administer models.
 | `GEMMA_CYBER_AUTH_AUDIENCE` | `https://api.gemma-cyber` | API identifier (audience) |
 | `GEMMA_CYBER_AUTH_ISSUER` | `https://your-tenant.eu.auth0.com/` | Optional; defaults to `https://<domain>/` |
 | `GEMMA_CYBER_AUTH_JWKS_URL` | *(derived)* | Optional; defaults to `https://<domain>/.well-known/jwks.json` |
-| `GEMMA_CYBER_AUTH_ALGORITHMS` | `RS256` | Signing algorithms (comma-separated) |
-| `GEMMA_CYBER_AUTH_LEEWAY` | `60` | Clock-skew seconds |
+| `GEMMA_CYBER_AUTH_ALGORITHMS` | `RS256` | Signing algorithms. Hosted/prod: **RS256 only** (HS256 refused at start) |
+| `GEMMA_CYBER_AUTH_LEEWAY` | `60` | Clock-skew seconds (capped at 120) |
 | `GEMMA_CYBER_WEB_AUTH0_CLIENT_ID` | `abc123…` | **Public** SPA client id for the browser login flow (never a secret) |
 
 > In hosted mode, if JWT auth is on but `GEMMA_CYBER_WEB_AUTH0_CLIENT_ID` is
@@ -80,6 +83,23 @@ dev token carries no scopes, so it can chat but never administer models.
    protection, breached-password protection) per your organization — these are
    tenant values not inferable from source. Assign `admin:models` to a tightly
    controlled admin role only; use a separate non-admin account for staging tests.
+
+### Operator evidence (AUTH-001 — cannot be done from this repo)
+
+After the tenant exists, record (redact tenant internals; do not commit secrets):
+
+- [ ] Staging generate with a valid access token → 200
+- [ ] Missing token → 401 (`scripts/smoke_test.py --expect-auth`)
+- [ ] Token without `admin:models` → 403 on promote
+- [ ] JWKS outage → 503 `authentication provider unavailable` (see runbook)
+
+In-repo proof without a live tenant: `tests/test_api_auth.py` (self-signed RS256 +
+mocked JWKS). Compose placeholders: `docker-compose.prod.yml` and
+`deploy/prod.env.example`.
+
+Hosted JWT also requires **HTTPS** issuer and JWKS URLs (`http://` is refused at
+startup). Dev may use looser algorithm lists for local experiments; do not copy
+that into prod.
 
 Everything below the dashboard — token validation, claim checks, rotation,
 authorization — is implemented and tested in-repo (`tests/test_api_auth.py`, using
