@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Gemma-Cyber</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#input">Skip to the composer</a>
+
+  <header class="app-bar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <h1>Gemma-Cyber</h1>
+    </div>
+    <span class="env-badge" id="env-badge" hidden></span>
+    <span class="model-chip" id="model-chip">model <strong id="model-name">…</strong></span>
+
+    <div class="spacer"></div>
+
+    <span class="status-chip" id="status" role="status" aria-live="polite">
+      <span class="dot" id="status-dot" aria-hidden="true"></span>
+      <span class="label" id="status-text">checking…</span>
+    </span>
+
+    <div class="auth-area" id="auth-area" hidden>
+      <span class="identity" id="identity" hidden></span>
+      <button type="button" class="btn-ghost" id="sign-in" hidden>Sign in</button>
+      <button type="button" class="btn-ghost" id="sign-out" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <!-- Signed-out gate (only shown when auth is required and no session) -->
+  <section class="auth-gate" id="auth-gate" hidden aria-labelledby="gate-title">
+    <div class="auth-card">
+      <h2 id="gate-title">Authorized access only</h2>
+      <p>
+        This is a defensive cybersecurity assistant for education, authorized
+        testing, and CTF/lab use. Sign in with your approved account to continue.
+        Prompts and responses are not persisted.
+      </p>
+      <button type="button" class="btn-primary" id="gate-sign-in">Sign in</button>
+    </div>
+  </section>
+
+  <main class="workspace" id="workspace" hidden>
+    <div class="safety-note" role="note">
+      <strong>Defensive use only.</strong> Responses can be wrong or fabricated —
+      verify before acting. The model is instructed to reason from evidence and to
+      flag insufficient evidence rather than guess. Do not paste secrets or credentials.
+    </div>
+
+    <div class="conversation" id="log" aria-label="Conversation"></div>
+  </main>
+
+  <footer class="composer" id="composer" hidden>
+    <div class="composer-inner">
+      <form id="form">
+        <label for="input" class="visually-hidden">Your defensive security question</label>
+        <div class="composer-row">
+          <textarea id="input" rows="1"
+            placeholder="Ask a defensive security question…  (Enter to send, Shift+Enter for newline)"
+            aria-describedby="composer-hint" maxlength="24000"></textarea>
+          <button type="submit" class="btn-primary" id="send">Send</button>
+          <button type="button" class="btn-secondary" id="cancel" hidden>Cancel</button>
+        </div>
+        <div class="composer-foot">
+          <span id="composer-hint">Deterministic (temperature 0).</span>
+          <span class="char-count" id="char-count" aria-hidden="true">0 / 24000</span>
+        </div>
+        <p class="form-status" id="form-status" role="status" aria-live="assertive"></p>
+      </form>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

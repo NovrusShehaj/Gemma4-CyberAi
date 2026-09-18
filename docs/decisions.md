@@ -2,6 +2,124 @@
 
 Meaningful decisions and deviations from `PROJECT_PLAN.md`, newest first.
 
+## 2026-09-11 — `gemma4` agent implemented; the hosted no-tools boundary holds
+
+The agent specified in
+[`GEMMA4_TERMINAL_AGENT_IMPLEMENTATION_PLAN.md`](../GEMMA4_TERMINAL_AGENT_IMPLEMENTATION_PLAN.md)
+is now built in `src/gemma_cyber/agent/` behind the `[agent]` extra. See
+[`docs/agent.md`](agent.md). The 2026-09-11 split below is unchanged and is now
+enforced by tests rather than by convention.
+
+- **APP-GATE is untouched.** `gemma_cyber.api` has zero imports of
+  `gemma_cyber.agent` (static scan + clean-subprocess probe in
+  `tests/agent/test_import_boundary.py`). `InferenceEngine.generate` /
+  `/api/generate` remain the eval and hosted path; the agent uses a separate
+  `ChatProvider` chat port so scorecard behaviour cannot shift.
+- **MODEL-GATE is untouched.** Building an agent is not evidence about a model.
+  `gemma3-cyber:v0.2` remains experimental; the default stays `gemma3:4b`, and
+  the agent banner and system policy both state that answers are unverified and
+  that T1060-for-Kerberoasting is a known failure.
+- **Deviation (cancellation):** the plan's `AgentState.cancel_event: asyncio.Event`
+  is implemented as a `threading.Event`-backed `CancelToken`. Providers stream on
+  a worker thread and tools run in `asyncio.to_thread`; `asyncio.Event` is not
+  thread-safe, so setting it from either would be a data race.
+- **Deviation (Ollama `tool` role):** measured against a local daemon, gemma3's
+  chat template has no `tool` role — a `role="tool"` message is dropped and the
+  model then *fabricates* the file contents it never received. On the emulated
+  (XML codec) path the adapter therefore delivers tool results as labelled user
+  messages; the `<untrusted>` wrapper is unaffected.
+- **Deviation (stricter than specified):** `mode = "trusted"` is stripped from
+  the *user* config as well as the project config. The plan forbids only the
+  project file, but its own mode table lists CLI flags as the sole enabler, and a
+  `~/.config` file is not an interactive risk acknowledgement.
+- **Addition:** `agent/sanitize.py` is not in the plan's tree. The ANSI stripper
+  is needed by `tools/` (before re-injecting output into the model) and by `ui/`
+  (before rendering), and `tools/` must not import `ui/`, so it lives neutral.
+
+## 2026-09-11 — Opt-in local `gemma4` agent; hosted surfaces stay no-tools
+
+A Codex/Claude-Code-class terminal agent is specified in
+[`GEMMA4_TERMINAL_AGENT_IMPLEMENTATION_PLAN.md`](../GEMMA4_TERMINAL_AGENT_IMPLEMENTATION_PLAN.md).
+It is **not** part of APP-GATE and is **not implemented** in this commit.
+
+- **Split:** `gemma-cyber` and `gemma-cyber-serve` remain no-tools Q&A
+  (`InferenceEngine` → Ollama `/api/generate`). The agent is a future extra
+  `[agent]` with a separate binary `gemma4`, package `src/gemma_cyber/agent/`.
+  FastAPI/web **must not** import that package.
+- **Why a new chat port:** `/api/generate` is the eval/API contract. Multiturn
+  + tools need `ChatProvider` + Ollama `/api/chat` (and later OpenAI-compat).
+- **Default deny:** permission mode `read-only`; writes/shell require an
+  explicit mode; `trusted` is TTY-only with `--i-accept-risk`. Workspace
+  content and `GEMMA4.md` are untrusted data, not policy.
+- **Language:** Python 3.11–3.12 in-tree (Typer / Rich / Prompt Toolkit /
+  httpx). No second repo, no tools on the hosted API, no MCP in v1.
+- **Honesty:** default model remains `gemma3:4b`. Do not market tool
+  reliability the 4B base cannot deliver; do not promote `gemma3-cyber:v0.2`
+  as part of agent work.
+
+The 2026-09-10 rule still holds: do not add RAG, tools, or agents **as part of
+APP-GATE**. This ADR only opens a **local, opt-in** path behind the controls
+in the spec and `docs/security.md`.
+
+## 2026-09-10 — APP-GATE vs MODEL-GATE; production definition
+
+Gemma4-CyberAI is **not** production-ready as a specialized model, and must not
+be described as GREEN because a FastAPI stack exists.
+
+- **APP-GATE** is the application: single-host FastAPI + private Ollama + Auth0
+  JWT (or static bearer), TLS at the edge, fail-closed hosted config, rate
+  limits, sanitized errors, GitOps registry, restore procedure. An APP-GATE
+  ship may serve unevaluated-for-promotion **base** `gemma3:4b` only with the
+  waiver in `docs/model-card.md`.
+- **MODEL-GATE** is a registry row at stage `production` with `passed_eval=true`
+  after clearing `configs/eval_success_criteria.md`. exp-002r **failed** that
+  bar (`gemma3-cyber:v0.2` stays experimental). Do not promote it. Do not add
+  RAG, tools, agents, Kubernetes, or a 14B flagship as part of APP-GATE.
+- `.claude/TODO-230826.md` is **archival** (eval-only MVP snapshot). Do not
+  rebuild Benchmark v2 or treat “add CI” as open work.
+- Default Compose remains `staging` + localhost for local eval.
+  `docker-compose.prod.yml` is the fail-closed overlay (auth env required).
+
+## 2026-08-27 — exp-002r: local MLX-LoRA training path + first MEASURED fine-tune
+
+The exp-002 Colab run trained but lost its artifacts before evaluation, and "no
+local GPU" had been treated as a hard blocker. The dev machine is in fact an M3
+Max / 128 GB, so a **local Apple-Silicon training path** was stood up and used to
+produce and measure the project's first real fine-tune.
+
+- **New: `mlx-lm` LoRA path.** `src/gemma_cyber/training/mlx_data.py` (deterministic
+  `{train,valid}.jsonl` from a `TrainingItem` dataset, SHA-manifested),
+  `scripts/train_mlx_lora.py` (build → `mlx_lm lora` → `mlx_lm fuse`, `--dry-run`),
+  `configs/training/mlx_lora_gemma3_4b_v0.2.yaml` (mirror of the QLoRA cloud
+  config: same base weights, r=16, scale 2.0, 3 epochs, seq 1024, completion-only
+  loss via `mask_prompt`), `configs/training/requirements-train-mlx.txt`. The
+  CUDA/`train_qlora.py` path is unchanged and still the cloud option.
+- **Deviations from the exp-002 QLoRA config** (Apple-Silicon-practical, per
+  roadmap §7.2): LoRA on the last 16 layers not all 34; effective batch 4 not 8.
+  Both make exp-002r a *weaker* intervention, so its negative result is
+  conservative. Documented in `docs/experiments/exp-002r.md` §1.
+- **New: `MlxClient`** (`src/gemma_cyber/evaluation/mlx_client.py`) +
+  `scripts/run_baseline_mlx.py` — the harness scores a fused MLX model directly.
+  Needed because `ollama create` cannot import MLX-quantised weights ("unknown
+  data type: U32") and `mlx_lm`'s GGUF export does not support gemma3. The MLX
+  4-bit base scores **0.933** on benchmark_v2 test — identical to the Ollama
+  `gemma3:4b` anchor — so the runtime switch does not move the baseline.
+- **Result: exp-002r DOES NOT PASS** (`experiments/exp-002r-gemma3-cyber-v0.2/RESULTS.md`).
+  v2 do-no-harm holds (0.933 → 0.956, best checkpoint = end-of-epoch-3, *not* the
+  lowest-val-loss one — they disagreed), but the targeted benchmark_v3 objectives
+  all fail: `attack_mapping` 0.25 → 0.00, the Kerberoasting T1060 trap still emits
+  T1060, `false_premise` flat at 0.00. 277 examples × 3 epochs did not teach exact
+  ATT&CK IDs. First measured verdict for the project's first fine-tune; goalposts
+  unchanged (`configs/eval_success_criteria.md` §5). Motivates exp-003 (scale
+  `sft_v0.3` to 1.5–3k, denser ATT&CK-precision family, benchmark-based checkpoint
+  selection) before further HP work.
+- **Fix: Dockerfile `uv sync`.** `uv sync --locked --frozen` is rejected by
+  current uv ("cannot be used with"); changed to `--locked` alone. The image now
+  builds; re-verified non-root (`app`), prod fail-closed without auth, `/health`,
+  and static-token 401 on `/v1/generate`.
+- **Registry:** `gemma3-cyber:v0.2` experiment ref → `exp-002r`, `eval_ref` → the
+  results file, `passed_eval` stays false, history entry added.
+
 ## 2026-08-25 — SFT v0.2, benchmark v3, evaluation hardening, exp-002 prep
 
 Evaluation-first hardening + a genuinely diverse dataset, preparing the **first real**

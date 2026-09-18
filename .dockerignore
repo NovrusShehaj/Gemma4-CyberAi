@@ -1,0 +1,17 @@
+.git
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+.DS_Store
+experiments
+notebooks
+docs
+agents
+*.gguf
+*.safetensors
+data/raw
+data/processed
+data/quarantine

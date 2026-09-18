@@ -1,0 +1,71 @@
+# Local/production-like stack: the Gemma-Cyber API + an Ollama model runtime.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose exec ollama ollama pull gemma3:4b     # one-time model pull
+#   open http://localhost:8000/
+#
+# This is a SINGLE-HOST deployment (the documented target). For public exposure,
+# use the production overlay (auth required, rate limit on) and a TLS-terminating
+# reverse proxy:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# See docs/deployment.md and deploy/TLS-CHECKLIST.md.
+
+services:
+  ollama:
+    # Pin for a reproducible release: set OLLAMA_IMAGE to a specific version or
+    # digest (e.g. ollama/ollama:0.x.y or ...@sha256:...). `latest` is a dev
+    # default only — do NOT ship `latest` in production (see docs/deployment.md).
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    volumes:
+      - ollama-models:/root/.ollama   # persist pulled models across restarts
+    # Not published to the host: only the api service reaches it over the
+    # compose network, so the raw model runtime is never exposed.
+    expose:
+      - "11434"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      GEMMA_CYBER_OLLAMA_HOST: http://ollama:11434
+      GEMMA_CYBER_MODEL: gemma3:4b
+      # `staging` starts open for local evaluation. For a real/public deployment set
+      # GEMMA_CYBER_ENV=prod AND configure auth below — in prod the service REFUSES
+      # to start without authentication (fail-closed). See docs/auth.md.
+      GEMMA_CYBER_ENV: staging
+      # --- Production auth (recommended: Auth0 JWT) ---
+      # GEMMA_CYBER_ENV: prod
+      # GEMMA_CYBER_AUTH_DOMAIN: ${GEMMA_CYBER_AUTH_DOMAIN}
+      # GEMMA_CYBER_AUTH_AUDIENCE: ${GEMMA_CYBER_AUTH_AUDIENCE}
+      # ...or a static dev-grade token, and a rate limit when exposed publicly:
+      # GEMMA_CYBER_API_TOKEN: ${GEMMA_CYBER_API_TOKEN}
+      # GEMMA_CYBER_RATE_LIMIT_PER_MIN: "60"
+      # --- Capacity / product policy (hosted defaults are already safe) ---
+      # GEMMA_CYBER_MAX_CONCURRENT_GENERATIONS: "4"   # bound in-flight generations
+      # GEMMA_CYBER_CORS_ORIGINS: "https://app.example.com"  # exact origins only
+      # GEMMA_CYBER_WEB_AUTH0_CLIENT_ID: ${GEMMA_CYBER_WEB_AUTH0_CLIENT_ID}  # public SPA id
+      GEMMA_CYBER_REGISTRY_PATH: /app/registry/registry.json
+    volumes:
+      # Registry is mounted READ-ONLY (:ro). Hosted mode defaults to a GitOps,
+      # read-only registry — runtime admin-mutation routes are disabled and model
+      # lifecycle changes go through reviewed, source-controlled updates to
+      # data/models/registry.json. This matches the app's registry_writable=false
+      # default in staging/prod, so writes fail safely rather than corrupting a
+      # host-mounted file. To allow runtime mutation instead, provide a durable
+      # writable volume AND set GEMMA_CYBER_REGISTRY_WRITABLE=true.
+      - ./data/models:/app/registry:ro
+    ports:
+      - "127.0.0.1:8000:8000"   # bind to localhost; front with a proxy for public use
+    restart: unless-stopped
+
+volumes:
+  ollama-models:

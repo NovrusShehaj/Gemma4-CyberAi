@@ -1,0 +1,429 @@
+{
+  "project": {
+    "name": "Gemma-Cyber v0.2 (exp-002): Free Cloud QLoRA Training & GGUF Export",
+    "repository": "https://github.com/novrusshehaj/Gemma4-CyberAi",
+    "experiment_id": "exp-002",
+    "stated_purpose": "Fine-tune Gemma-3-4B-it on a curated cybersecurity instruction dataset using QLoRA, merge the LoRA weights into the base model, and export a quantized GGUF model for local inference with Ollama.",
+    "prior_model_context": "gemma3-cyber:v0.1 is described in the notebook as only a system-prompt alias of the base model (not an actual fine-tune). exp-002 is described as the project's first real fine-tune.",
+    "dataset_rationale": "sft_v0.2 is described as the first dataset with genuine answer-level diversity (277/277 unique answers vs. v0.1's 91/360) across 15 task types, and explicitly teaches exact ATT&CK IDs (e.g. Kerberoasting = T1558.003, contrasted with a hallucinated T1060 attributed to v0.1/base behavior).",
+    "chat_format_note": "Gemma templates historically reject a standalone system role and use role name 'model' (not 'assistant'). The notebook uses the repo's own to_gemma_chat_text() formatter instead of the tokenizer's chat template, and masks loss to only the model-turn tokens.",
+    "intended_downstream_use": "Quantized GGUF model (gemma3-cyber-v0.2-Q4_K_M.gguf) run locally via Ollama, evaluated against base gemma3:4b on two benchmark sets (benchmark_v2.jsonl, benchmark_v3.jsonl).",
+    "hardware_target_stated": "Free Google Colab T4 GPU (15GB VRAM) or L4/A100. Sequence length 1024 keeps a T4 comfortable.",
+    "reference_doc_not_inspected": "docs/experiments/exp-002.md"
+  },
+  "environment": {
+    "platform": "Google Colab",
+    "gpu": "Tesla T4",
+    "gpu_vram_mib": 15360,
+    "gpu_driver_version": "580.82.07",
+    "cuda_version_driver_reported": "13.0",
+    "gpu_utilization_at_checkin_percent": 0,
+    "python_version": "3.13 (inferred from dist-packages paths, e.g. /usr/local/lib/python3.13/dist-packages/peft/...)",
+    "os_base_image": "Not available from the Colab notebook",
+    "packages_installed_step1_unpinned": ["torch", "transformers", "peft", "trl", "bitsandbytes", "accelerate", "datasets", "pyyaml"],
+    "package_versions_pinned_or_observed": {
+      "torchao_initial": "0.10.0",
+      "torchao_required_by_peft": "> 0.16.0",
+      "torchao_after_fix_requested": ">=0.16.0 (exact resolved version not printed in visible output)"
+    },
+    "llama_cpp_source": "https://github.com/ggerganov/llama.cpp (cloned fresh each Step 5 run; no commit hash captured)",
+    "terminal_shell": "bash, cwd /content (Colab Terminal panel)"
+  },
+  "models": [
+    {
+      "role": "base_model",
+      "name": "google/gemma-3-4b-it",
+      "gated": true,
+      "quantization_for_training": {
+        "load_in_4bit": true,
+        "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_use_double_quant": true,
+        "bnb_4bit_compute_dtype": "torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16"
+      },
+      "download_footprint_observed": {
+        "download_complete": "7.75GB, 77.7MB/s",
+        "reconstruction_complete": "8.60GB / 8.60GB",
+        "weights_loaded": "883/883 tensors, 00:34, 132.24it/s"
+      },
+      "warnings": ["[transformers] `torch_dtype` is deprecated! Use `dtype` instead!"]
+    },
+    {
+      "role": "lora_adapter",
+      "name": "gemma3-cyber:v0.2 adapter (unnamed in notebook beyond directory name)",
+      "base_model": "google/gemma-3-4b-it",
+      "lora_config": {
+        "r": 16,
+        "lora_alpha": 32,
+        "lora_dropout": 0.05,
+        "bias": "none",
+        "task_type": "CAUSAL_LM",
+        "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+      },
+      "trainable_parameters": 32788480,
+      "total_parameters": 4332867952,
+      "trainable_percent_computed_not_observed": 0.7567,
+      "saved_to": "./final_adapter",
+      "on_disk_confirmation": {
+        "confirmed_present_at": "2026-08-25 15:13 (per file timestamps), during terminal check performed shortly after Step 4 completed",
+        "files": [
+          {"name": "adapter_config.json", "size_bytes": 1153},
+          {"name": "adapter_model.safetensors", "size_bytes": 65673296},
+          {"name": "chat_template.jinja", "size_bytes": 1532},
+          {"name": "README.md", "size_bytes": 5206},
+          {"name": "tokenizer_config.json", "size_bytes": 745},
+          {"name": "tokenizer.json", "size_bytes": 33384567}
+        ],
+        "later_confirmed_absent": "Yes - a subsequent terminal check (after Step 5 attempt 3 succeeded) found /content empty except default .config and sample_data folders; final_adapter no longer present."
+      }
+    },
+    {
+      "role": "merged_model",
+      "name": "gemma3-cyber-v0.2-merged (directory name as coded)",
+      "precision": "FP16",
+      "produced_by": "PeftModel.from_pretrained(base_model, './final_adapter').merge_and_unload()",
+      "current_existence": "Not present in the runtime at extraction time. Unknown whether copied out before runtime reset."
+    },
+    {
+      "role": "gguf_export",
+      "f16_filename": "gemma3-cyber-v0.2.gguf",
+      "quantized_filename": "gemma3-cyber-v0.2-Q4_K_M.gguf",
+      "quantization_method": "Q4_K_M via llama-quantize",
+      "gguf_metadata_observed": {
+        "context_length": 131072,
+        "embedding_length": 2560,
+        "feed_forward_length": 10240,
+        "head_count": 8,
+        "key_value_head_count": 4,
+        "rope_scaling_type": "LINEAR",
+        "rope_theta": 1000000.0,
+        "rope_theta_swa": 10000.0,
+        "rms_norm_epsilon": 1e-06,
+        "file_type": 1
+      },
+      "current_existence": "Not present in the runtime at extraction time. Unknown whether downloaded to user's local machine before runtime reset."
+    }
+  ],
+  "datasets": [
+    {
+      "name": "sft_v0.2.jsonl",
+      "path": "data/training/sft_v0.2.jsonl",
+      "example_count": 277,
+      "diversity_stat_as_stated": "277/277 unique answers vs. v0.1's 91/360",
+      "task_type_count_as_stated": 15,
+      "format": "JSON Lines, each line has 'id' and 'messages' fields",
+      "id_uniqueness_check": "assert len(set of json-dumped ids) == len(items) - no assertion error observed, implying all 277 ids unique",
+      "chat_formatting_function": "gemma_cyber.data.formatting.to_gemma_chat_text()",
+      "loss_masking": "Custom CompletionOnlyCollator masks all tokens through the first '<start_of_turn>model\\n'",
+      "sample_row_text": "Not available from the Colab notebook (print output not retrievable)",
+      "referenced_but_not_run": [
+        {"name": "benchmark_v2.jsonl", "path": "data/evaluation/benchmark_v2.jsonl", "purpose": "do-no-harm / regression anchor", "split": "test"},
+        {"name": "benchmark_v3.jsonl", "path": "data/evaluation/benchmark_v3.jsonl", "purpose": "targeted sensitivity instrument - ATT&CK precision, false premises, factual scorer", "split": "test"}
+      ]
+    }
+  ],
+  "training_configurations": [
+    {
+      "run_ref": "run_5_step4_training",
+      "base_model": "google/gemma-3-4b-it",
+      "quantization_train_time": "4-bit NF4, double quant, compute dtype bf16 if supported else fp16",
+      "lora_r": 16,
+      "lora_alpha": 32,
+      "lora_dropout": 0.05,
+      "lora_bias": "none",
+      "lora_target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+      "task_type": "CAUSAL_LM",
+      "num_train_epochs": 3,
+      "per_device_train_batch_size": 2,
+      "gradient_accumulation_steps": 4,
+      "effective_batch_size_computed": 8,
+      "gradient_checkpointing": true,
+      "learning_rate": 0.0002,
+      "lr_scheduler_type": "cosine",
+      "warmup_ratio": 0.05,
+      "weight_decay": 0.01,
+      "optimizer": "paged_adamw_8bit",
+      "logging_steps": 10,
+      "save_strategy": "epoch",
+      "save_total_limit": 2,
+      "precision": "bf16 if torch.cuda.is_bf16_supported() else fp16",
+      "seed": 42,
+      "max_sequence_length": 1024,
+      "packing": false,
+      "dataset_text_field": "text",
+      "report_to": "none",
+      "output_dir": "./results_gemma3_cyber_v0.2",
+      "steps_per_epoch_computed": 35,
+      "total_steps_computed": 105,
+      "total_steps_observed": 105,
+      "cross_check_note": "computed steps_per_epoch (ceil(277/8)=35) * 3 epochs = 105, exactly matches observed [105/105] progress bar"
+    }
+  ],
+  "experiments": [
+    {
+      "run_id": "run_1",
+      "step": "Step 1",
+      "name": "Environment setup",
+      "objective": "Install dependencies, confirm GPU availability",
+      "result": "Tesla T4 confirmed, 0% utilization, no running processes. Packages installed via unpinned pip install.",
+      "status": "succeeded",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "run_id": "run_2",
+      "step": "Step 1.5",
+      "name": "Hugging Face authentication",
+      "objective": "Authenticate to download the gated google/gemma-3-4b-it model",
+      "result": "Not available from the Colab notebook - print confirmation output not retrievable",
+      "status": "unknown",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "run_id": "run_3",
+      "step": "Step 2",
+      "name": "Repository clone & dataset validation",
+      "objective": "Clone Gemma4-CyberAi repo and validate sft_v0.2.jsonl",
+      "result": "Clone succeeded (256 objects, 97 deltas resolved). Successfully loaded 277 training examples. No duplicate-id assertion error.",
+      "status": "succeeded",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "run_id": "run_4",
+      "step": "Step 3",
+      "name": "Base model load (QLoRA) + LoRA wrap",
+      "objective": "Load google/gemma-3-4b-it in 4-bit and wrap with LoRA adapter",
+      "result": "Model downloaded (7.75GB) and reconstructed (8.60GB); 883/883 weight tensors loaded. trainable params: 32,788,480 || all params: 4,332,867,952 (trailing trainable% truncated in output).",
+      "status": "succeeded",
+      "errors": [],
+      "warnings": ["[transformers] `torch_dtype` is deprecated! Use `dtype` instead!"]
+    },
+    {
+      "run_id": "run_5",
+      "step": "Step 4",
+      "name": "LoRA fine-tuning via SFTTrainer",
+      "objective": "Train the LoRA adapter on sft_v0.2.jsonl for 3 epochs",
+      "config_ref": "run_5_step4_training",
+      "result": "105/105 steps completed in 39 minutes 28 seconds across 3 epochs. Adapter saved to ./final_adapter.",
+      "status": "succeeded",
+      "duration": "39:28",
+      "errors": [],
+      "warnings": [],
+      "metrics_ref": ["training_loss_step_10", "training_loss_step_20", "training_loss_step_30", "training_loss_step_40", "training_loss_step_50", "training_loss_step_60", "training_loss_step_70", "training_loss_step_80", "training_loss_step_90", "training_loss_step_100"]
+    },
+    {
+      "run_id": "run_6",
+      "step": "Step 5 (attempt 1)",
+      "name": "Merge LoRA adapter & export GGUF - attempt 1",
+      "objective": "Merge LoRA adapter into base model, export quantized GGUF",
+      "result": "Failed before any merge work occurred.",
+      "status": "failed",
+      "errors": [
+        "ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported (raised in peft/import_utils.py::is_torchao_available())"
+      ],
+      "warnings": [],
+      "root_cause_as_diagnosed": "Step 1 installs peft unpinned; the resolved peft version checks torchao version even when torchao isn't otherwise used by this merge path. Colab's preinstalled torchao (0.10.0) was older than required (>0.16.0).",
+      "resolution": "Added `!pip install -q -U \"torchao>=0.16.0\"` to top of Step 5 cell."
+    },
+    {
+      "run_id": "run_7",
+      "step": "Step 5 (attempt 2)",
+      "name": "Merge LoRA adapter & export GGUF - attempt 2",
+      "objective": "Same as attempt 1, after torchao fix",
+      "result": "Failed at the base model load line.",
+      "status": "failed",
+      "errors": [
+        "NameError: name 'AutoModelForCausalLM' is not defined (at base_model = AutoModelForCausalLM.from_pretrained(...))"
+      ],
+      "warnings": [
+        "WARNING:torchao:Failed to load /usr/local/lib/python3.13/dist-packages/torchao/_C_cutlass_90a.abi3.so: Could not load this library",
+        "WARNING:torchao:Failed to load /usr/local/lib/python3.13/dist-packages/torchao/_C_mxfp8.cpython-310-x86_64-linux-gnu.so: Could not load this library"
+      ],
+      "root_cause_as_diagnosed": "Colab runtime/kernel had been restarted between attempts; Steps 1-4's imports and variables no longer existed in the fresh kernel session, even though ./final_adapter survived on disk at that point.",
+      "resolution": "Rewrote Step 5 cell to be self-contained: re-imports torch/AutoModelForCausalLM/AutoTokenizer, redefines model_id, fixes working directory, reuses or reloads tokenizer, independent of whether Steps 1-4 ran in the same kernel session."
+    },
+    {
+      "run_id": "run_8",
+      "step": "Step 5 (attempt 3)",
+      "name": "Merge LoRA adapter & export GGUF - attempt 3",
+      "objective": "Same as above, with self-contained fix in place",
+      "result": "Completed. Observed: 'Merged model saved.' -> llama.cpp cloned -> GGUF conversion (blocks 0-9 directly observed with no errors, remaining blocks not individually confirmed due to output virtualization) -> GGUF metadata written -> 3 duplicate-key warnings -> llama-quantize built and run -> final success message printed.",
+      "status": "succeeded (per available evidence; not exhaustively verified line-by-line due to output virtualization - see reproducibility caveats)",
+      "errors": [],
+      "warnings": [
+        "WARNING:gguf.gguf_writer:Duplicated key name 'gemma3.context_le...' (truncated, full text not recoverable)",
+        "WARNING:gguf.gguf_writer:Duplicated key name 'gemma3.attention....' (truncated, full text not recoverable)",
+        "WARNING:gguf.gguf_writer:Duplicated key name 'gemma3.attention....' (truncated, full text not recoverable)"
+      ],
+      "final_output_line": "Exported gemma3-cyber-v0.2-Q4_K_M.gguf ready for Ollama!",
+      "post_run_state": "At extraction time, Colab runtime showed 'Reconnect' (disconnected). Terminal check found /content empty except default .config and sample_data folders - no repo, no final_adapter, no merged model, no .gguf files. Runtime disk was reset/reassigned at some point after this run."
+    },
+    {
+      "run_id": "run_9",
+      "step": "Step 6",
+      "name": "Ollama creation / evaluation",
+      "objective": "Download .gguf locally, create Ollama model, run benchmark_v2 and benchmark_v3 evaluations comparing gemma3-cyber:v0.2 to base gemma3:4b",
+      "result": "Not executed as designed. 'ollama create gemma3-cyber:v0.2 -f Modelfile.template' was run directly in the Colab terminal (not the user's local machine) and failed.",
+      "status": "not_executed / attempted_incorrectly",
+      "errors": [
+        "-bash: ollama: command not found (Colab Terminal, not a notebook cell)"
+      ],
+      "warnings": [],
+      "observation": "Expected failure - Ollama is not installed on the Colab VM. Step 6 instructions specify running on the user's own computer after downloading the .gguf file there.",
+      "evaluation_scripts_status": "No evidence scripts/run_baseline.py was run against benchmark_v2.jsonl or benchmark_v3.jsonl for either model."
+    }
+  ],
+  "metrics": [
+    {"name": "training_loss", "run_ref": "run_5", "step": 10, "value": 2.890367},
+    {"name": "training_loss", "run_ref": "run_5", "step": 20, "value": 1.882823},
+    {"name": "training_loss", "run_ref": "run_5", "step": 30, "value": 1.570567},
+    {"name": "training_loss", "run_ref": "run_5", "step": 40, "value": 1.334106},
+    {"name": "training_loss", "run_ref": "run_5", "step": 50, "value": 0.975393},
+    {"name": "training_loss", "run_ref": "run_5", "step": 60, "value": 0.948494},
+    {"name": "training_loss", "run_ref": "run_5", "step": 70, "value": 0.993106},
+    {"name": "training_loss", "run_ref": "run_5", "step": 80, "value": 0.625255},
+    {"name": "training_loss", "run_ref": "run_5", "step": 90, "value": 0.510340},
+    {"name": "training_loss", "run_ref": "run_5", "step": 100, "value": 0.685614},
+    {"name": "trainable_parameters", "run_ref": "run_4", "step": null, "value": 32788480},
+    {"name": "total_parameters", "run_ref": "run_4", "step": null, "value": 4332867952},
+    {"name": "trainable_percent_computed", "run_ref": "run_4", "step": null, "value": 0.7567, "note": "computed from trainable_parameters/total_parameters, not directly observed in output text (truncated)"},
+    {"name": "training_wallclock_seconds", "run_ref": "run_5", "step": null, "value": 2368, "note": "39 min 28 sec, computed as seconds from observed '39:28'"},
+    {"name": "total_training_steps", "run_ref": "run_5", "step": null, "value": 105},
+    {"name": "epochs", "run_ref": "run_5", "step": null, "value": 3}
+  ],
+  "evaluation_results": [],
+  "errors": [
+    {
+      "id": "err_1",
+      "text": "ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported",
+      "location": "Step 5 attempt 1, peft/import_utils.py::is_torchao_available()",
+      "resolved": true,
+      "resolution": "pip install -q -U \"torchao>=0.16.0\" added to top of Step 5 cell"
+    },
+    {
+      "id": "err_2",
+      "text": "NameError: name 'AutoModelForCausalLM' is not defined",
+      "location": "Step 5 attempt 2, at base_model = AutoModelForCausalLM.from_pretrained(...)",
+      "resolved": true,
+      "resolution": "Step 5 cell rewritten to be self-contained (re-imports, redefines model_id, fixes cwd, reuses/reloads tokenizer)"
+    },
+    {
+      "id": "err_3",
+      "text": "-bash: ollama: command not found",
+      "location": "Colab Terminal panel (not a notebook cell), when running 'ollama create gemma3-cyber:v0.2 -f Modelfile.template'",
+      "resolved": false,
+      "resolution": "Not applicable - expected behavior; command needs to be run on the user's local machine, not Colab"
+    }
+  ],
+  "warnings": [
+    {
+      "id": "warn_1",
+      "text": "WARNING:torchao:Failed to load /usr/local/lib/python3.13/dist-packages/torchao/_C_cutlass_90a.abi3.so: Could not load this library",
+      "location": "Step 5 attempt 2",
+      "resolved": false,
+      "severity": "non-blocking",
+      "note": "Optional torchao CUDA extension, not required for this CPU-based merge path"
+    },
+    {
+      "id": "warn_2",
+      "text": "WARNING:torchao:Failed to load /usr/local/lib/python3.13/dist-packages/torchao/_C_mxfp8.cpython-310-x86_64-linux-gnu.so: Could not load this library",
+      "location": "Step 5 attempt 2",
+      "resolved": false,
+      "severity": "non-blocking",
+      "note": "Filename embeds cpython-310 while environment runs python3.13 - possible ABI/packaging mismatch (inference, not confirmed)"
+    },
+    {
+      "id": "warn_3",
+      "text": "[transformers] `torch_dtype` is deprecated! Use `dtype` instead!",
+      "location": "Step 3 output, during AutoModelForCausalLM.from_pretrained(...)",
+      "resolved": false,
+      "severity": "non-blocking",
+      "note": "Notebook code still uses torch_dtype= in Steps 3 and 5"
+    },
+    {
+      "id": "warn_4",
+      "text": "WARNING:gguf.gguf_writer:Duplicated key name 'gemma3.context_le...' (truncated)",
+      "location": "Step 5 attempt 3, GGUF metadata writing",
+      "resolved": "unknown",
+      "severity": "unknown - not investigated",
+      "note": "Full key name not recoverable due to output rendering constraints"
+    },
+    {
+      "id": "warn_5",
+      "text": "WARNING:gguf.gguf_writer:Duplicated key name 'gemma3.attention....' (truncated)",
+      "location": "Step 5 attempt 3, GGUF metadata writing",
+      "resolved": "unknown",
+      "severity": "unknown - not investigated",
+      "note": "Full key name not recoverable; appeared twice with this same truncated prefix"
+    }
+  ],
+  "observations": [
+    "The dataset (277 examples) loaded and validated with no duplicate IDs.",
+    "QLoRA fine-tuning completed all 3 epochs (105/105 steps) in 39:28 on a single T4 GPU with no observed training-time errors.",
+    "Training loss decreased overall from 2.890367 (step 10) to a minimum of 0.510340 (step 90), but not monotonically - it rose at steps 60-70 and again at step 100.",
+    "The LoRA adapter (32,788,480 / 4,332,867,952 params) was saved to ./final_adapter and was confirmed present on disk with all expected files at one point in time.",
+    "The merge-export pipeline reached its final success message at least once (Step 5 attempt 3).",
+    "Two distinct blocking errors were encountered and resolved across three attempts at Step 5.",
+    "By the time of this extraction, /content was empty - none of the training or export artifacts currently exist in the live Colab runtime.",
+    "No evaluation of the fine-tuned model's output quality, correctness, or safety has been performed.",
+    "The user attempted to run Ollama commands directly in the Colab terminal rather than on their local machine, which is not the intended workflow per Step 6's instructions."
+  ],
+  "inferences": [
+    "The torchao _C_mxfp8 shared library's filename (cpython-310) versus the environment's Python 3.13 suggests a possible ABI/packaging mismatch for that specific optional extension - not confirmed beyond the filename/path evidence.",
+    "The non-monotonic training loss pattern is consistent with ordinary mini-batch noise given the small dataset and few logged points, but could also reflect learning-rate/scheduler effects; the notebook does not provide enough information to distinguish between these.",
+    "The Colab runtime most likely disconnected due to an idle timeout, manual restart, or crash between Step 5 attempt 3 succeeding and this extraction, but the notebook/terminal provide no direct evidence of which."
+  ],
+  "unknowns": [
+    "Whether gemma3-cyber-v0.2-Q4_K_M.gguf or final_adapter currently exists anywhere outside the Colab runtime (local machine, Google Drive, cloud storage).",
+    "Results of scripts/run_baseline.py against benchmark_v2.jsonl and benchmark_v3.jsonl for either gemma3:4b (base) or gemma3-cyber:v0.2 - not run.",
+    "Whether the fine-tuned model is more accurate on MITRE ATT&CK technique IDs than the base model.",
+    "Whether the do-no-harm regression anchor (benchmark_v2) passes.",
+    "Whether the three GGUF duplicate-key warnings are benign or indicate a metadata correctness problem.",
+    "Root cause of the training loss rises at steps 60-70 and 100.",
+    "Cause of the Colab runtime disconnect/reset after the successful Step 5 run.",
+    "Exact resolved versions of torch, transformers, peft, trl, bitsandbytes, accelerate, torchao (post-fix) - no pip freeze captured.",
+    "Content of the 'Sample formatted example' print output from Step 4 (not retrievable).",
+    "Output of the Step 1.5 authentication confirmation print (not retrievable).",
+    "Exact llama.cpp commit/version used for conversion and quantization."
+  ],
+  "reproducibility": {
+    "available": [
+      "Full LoRA/QLoRA/training hyperparameters",
+      "Exact base model identifier (google/gemma-3-4b-it)",
+      "Exact dataset path and example count (data/training/sft_v0.2.jsonl, 277 examples)",
+      "Source repository (https://github.com/novrusshehaj/Gemma4-CyberAi)",
+      "Exact merge/export commands and target filenames",
+      "GPU type used (Tesla T4, 15GB)",
+      "Confirmed on-disk artifact listing for final_adapter/ at one point in time, including file sizes"
+    ],
+    "missing": [
+      "Pinned package versions for torch, transformers, peft, trl, bitsandbytes, accelerate, datasets",
+      "Resolved torchao version after the >=0.16.0 upgrade",
+      "Actual content of a formatted training example",
+      "Any evaluation results",
+      "Exact llama.cpp commit/version",
+      "Multiple runs to assess seed/variance effects (only one run performed)"
+    ]
+  },
+  "open_questions": [
+    "Does the exported gemma3-cyber-v0.2-Q4_K_M.gguf file currently exist anywhere outside Colab?",
+    "What are the actual benchmark_v2/benchmark_v3 results for base vs fine-tuned model?",
+    "Is the fine-tuned model more accurate on MITRE ATT&CK technique IDs than the base model?",
+    "Does the do-no-harm regression anchor (benchmark_v2) pass?",
+    "Are the three gguf.gguf_writer duplicate-key warnings benign or indicative of a real metadata problem?",
+    "What caused the training loss to rise at steps 60-70 and again at step 100?",
+    "What caused the Colab runtime to disconnect/reset after the successful Step 5 run?",
+    "What exact package versions were resolved by the unpinned Step 1 install?"
+  ],
+  "recommended_investigation_areas": [
+    "Determine whether gemma3-cyber-v0.2-Q4_K_M.gguf or final_adapter survived anywhere outside the Colab runtime before re-running any part of the pipeline.",
+    "Run the two pending evaluations (benchmark_v2.jsonl, benchmark_v3.jsonl) for both gemma3:4b (base) and gemma3-cyber:v0.2, per the do-no-harm guard + v3 hallucination/ATT&CK precision targets referenced in docs/experiments/exp-002.md.",
+    "Investigate the cause and impact of the three gguf.gguf_writer Duplicated key name warnings during GGUF export.",
+    "Investigate the non-monotonic training loss curve (rises at steps 60-70 and 100).",
+    "Pin and record exact package versions (pip freeze) for full reproducibility, especially torchao, peft, and transformers.",
+    "Clarify/harden the Step 5 to Step 6 handoff so it is unambiguous that ollama create/run must be executed on the user's local machine, not the Colab terminal.",
+    "Consider adding a step that automatically persists the exported .gguf (e.g. to Google Drive) immediately after Step 5 completes, given Colab's local disk is not durable across runtime resets.",
+    "Consider whether additional data or a held-out validation split during training would improve confidence in the training results, given the small dataset size (277 examples)."
+  ]
+}

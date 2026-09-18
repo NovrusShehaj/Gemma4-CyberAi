@@ -8,6 +8,7 @@ dist/
 .venv/
 venv/
 env/
+agents/
 .python-version
 
 # ---- Environments & secrets (NEVER commit) ----
@@ -29,6 +30,10 @@ secrets.yml
 
 # ---- Models & large artifacts (kept out of git) ----
 models/
+# ...but the model registry is metadata/audit-trail (promotions, provenance), not
+# weights — track it.
+!data/models/
+!data/models/registry.json
 *.gguf
 *.safetensors
 *.bin
@@ -41,6 +46,8 @@ data/raw/
 data/processed/
 data/quarantine/
 # NOTE: data/evaluation/ (frozen benchmark) and data/training/ ARE tracked intentionally.
+# ...except generated MLX training splits (rebuilt deterministically from the JSONL):
+data/training/mlx/
 
 # ---- Tooling caches ----
 .pytest_cache/
@@ -56,3 +63,8 @@ data/quarantine/
 
 # ---- Experiment outputs: keep manifests/scorecards, ignore bulky raw dumps ----
 experiments/**/raw_outputs/
+# Fused/merged model directories are large derived artifacts (rebuilt by
+# scripts/train_mlx_lora.py); keep only the scorecards, manifests, RESULTS.md.
+experiments/**/fused_model/
+experiments/**/fused_*_4bit/
+experiments/**/fused_ep*/

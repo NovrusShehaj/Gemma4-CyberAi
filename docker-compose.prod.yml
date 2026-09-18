@@ -1,0 +1,31 @@
+# Production overlay for the single-host stack.
+#
+# Usage (requires Auth0 env in the shell or a 0600 env file — never commit secrets):
+#   set -a && source deploy/prod.env.example && set +a   # then fill real values
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This overlay:
+#   * sets GEMMA_CYBER_ENV=prod (app refuses to start without JWT or a static token)
+#   * requires AUTH_DOMAIN / AUTH_AUDIENCE / WEB_AUTH0_CLIENT_ID via ${VAR:?}
+#   * enables the hosted rate limiter
+#   * keeps Ollama unpublished and the API on 127.0.0.1 (TLS belongs at the edge)
+#
+# Compose interpolation fails closed if the required auth vars are unset, so
+# `docker compose -f docker-compose.yml -f docker-compose.prod.yml config`
+# cannot produce an open-generate production file.
+
+services:
+  api:
+    environment:
+      GEMMA_CYBER_ENV: prod
+      GEMMA_CYBER_MODEL: ${GEMMA_CYBER_MODEL:-gemma3:4b}
+      GEMMA_CYBER_RATE_LIMIT_PER_MIN: ${GEMMA_CYBER_RATE_LIMIT_PER_MIN:-60}
+      GEMMA_CYBER_MAX_CONCURRENT_GENERATIONS: ${GEMMA_CYBER_MAX_CONCURRENT_GENERATIONS:-4}
+      GEMMA_CYBER_AUTH_DOMAIN: ${GEMMA_CYBER_AUTH_DOMAIN:?set GEMMA_CYBER_AUTH_DOMAIN}
+      GEMMA_CYBER_AUTH_AUDIENCE: ${GEMMA_CYBER_AUTH_AUDIENCE:?set GEMMA_CYBER_AUTH_AUDIENCE}
+      GEMMA_CYBER_WEB_AUTH0_CLIENT_ID: ${GEMMA_CYBER_WEB_AUTH0_CLIENT_ID:?set GEMMA_CYBER_WEB_AUTH0_CLIENT_ID}
+      GEMMA_CYBER_CORS_ORIGINS: ${GEMMA_CYBER_CORS_ORIGINS:-}
+      # Optional overrides (https issuer/JWKS derived from DOMAIN if unset):
+      # GEMMA_CYBER_AUTH_ISSUER: ${GEMMA_CYBER_AUTH_ISSUER}
+      # GEMMA_CYBER_AUTH_JWKS_URL: ${GEMMA_CYBER_AUTH_JWKS_URL}
+      # GEMMA_CYBER_AUTH_ALGORITHMS: RS256

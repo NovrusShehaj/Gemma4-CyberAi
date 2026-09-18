@@ -1,0 +1,67 @@
+{
+  "data_manifest": {
+    "source": "/Users/novrusshehaj/Github/Gemma4-CyberAi/data/training/sft_v0.2.jsonl",
+    "source_sha256": "1a9e0b59a38ad29f39957b0aa961eb4bd77d93c2d6f48dba6147809a6e254f2f",
+    "val_fraction": 0.12,
+    "counts": {
+      "train": 243,
+      "valid": 34,
+      "total": 277
+    },
+    "outputs": {
+      "train": {
+        "path": "/Users/novrusshehaj/Github/Gemma4-CyberAi/data/training/mlx/sft_v0.2/train.jsonl",
+        "sha256": "4de3ef6f0e70e99af180f4b190e6ca328f7171b38b351f9110e40d7324b91046"
+      },
+      "valid": {
+        "path": "/Users/novrusshehaj/Github/Gemma4-CyberAi/data/training/mlx/sft_v0.2/valid.jsonl",
+        "sha256": "45c36d9245d3a457d942a100dfb62a24f6266bdc6a31b99ae70e07f8887cad78"
+      }
+    }
+  },
+  "config": {
+    "model": "mlx-community/gemma-3-4b-it-4bit",
+    "train": true,
+    "fine_tune_type": "lora",
+    "optimizer": "adamw",
+    "data": "data/training/mlx/sft_v0.2",
+    "seed": 42,
+    "num_layers": 16,
+    "batch_size": 4,
+    "iters": 183,
+    "max_seq_length": 1024,
+    "learning_rate": 0.0002,
+    "mask_prompt": true,
+    "grad_checkpoint": false,
+    "val_batches": -1,
+    "steps_per_report": 10,
+    "steps_per_eval": 61,
+    "save_every": 61,
+    "adapter_path": "experiments/exp-002r-gemma3-cyber-v0.2/mlx_adapters",
+    "lora_parameters": {
+      "rank": 16,
+      "scale": 2.0,
+      "dropout": 0.05,
+      "keys": [
+        "self_attn.q_proj",
+        "self_attn.k_proj",
+        "self_attn.v_proj",
+        "self_attn.o_proj",
+        "mlp.gate_proj",
+        "mlp.up_proj",
+        "mlp.down_proj"
+      ]
+    },
+    "lr_schedule": {
+      "name": "cosine_decay",
+      "warmup": 10,
+      "warmup_init": 1e-06,
+      "arguments": [
+        0.0002,
+        183,
+        1e-05
+      ]
+    }
+  },
+  "epochs": 3
+}

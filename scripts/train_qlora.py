@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Cloud QLoRA training script for Gemma-Cyber v0.1.
+"""Cloud QLoRA training script for Gemma-Cyber (exp-002 / sft_v0.2).
 
 Designed for cloud execution (RunPod, Modal, GCP, AWS, or Google Colab) on a GPU instance
-with PyTorch, CUDA, transformers, peft, trl, and bitsandbytes installed.
+with PyTorch, CUDA, transformers, peft, trl, and bitsandbytes installed. Formatting and
+completion-only masking are shared with the Colab notebook via `gemma_cyber.training`, so
+the script and the notebook train on an identical rendering (see that module's docstring).
+Pin the ML stack with `configs/training/requirements-train.txt` for a reproducible run.
 
 Usage:
-    python scripts/train_qlora.py --config configs/training/qlora_gemma3_4b.yaml
-    python scripts/train_qlora.py --config configs/training/qlora_gemma3_4b.yaml --dry-run
+    python scripts/train_qlora.py                                   # default: sft_v0.2 config
+    python scripts/train_qlora.py --config configs/training/qlora_gemma3_4b_v0.2.yaml
+    python scripts/train_qlora.py --config configs/training/qlora_gemma3_4b_v0.2.yaml --dry-run
 """
 
 from __future__ import annotations
@@ -122,7 +126,8 @@ def run_training(config: dict[str, Any], dry_run: bool = False) -> int:
     if missing_deps:
         print(
             f"\nERROR: Missing cloud training dependencies: {', '.join(missing_deps)}.\n"
-            f"Install them with: pip install torch transformers peft trl bitsandbytes accelerate",
+            f"Install the pinned stack with:\n"
+            f"    pip install -r configs/training/requirements-train.txt",
             file=sys.stderr,
         )
         return 3
@@ -139,9 +144,16 @@ def run_training(config: dict[str, Any], dry_run: bool = False) -> int:
         AutoModelForCausalLM,
         AutoTokenizer,
         BitsAndBytesConfig,
-        TrainingArguments,
     )
-    from trl import SFTTrainer
+    from trl import SFTConfig, SFTTrainer
+
+    # Shared with the Colab notebook so both paths format + mask identically.
+    from gemma_cyber.training import (
+        build_completion_only_collator,
+        format_for_sft,
+        make_sft_config_kwargs,
+        make_trainer_kwargs,
+    )
 
     model_id = config["model"]["base_model_name_or_path"]
     print(f"\nInitializing 4-bit Quantization for base model: {model_id}")
@@ -179,37 +191,52 @@ def run_training(config: dict[str, Any], dry_run: bool = False) -> int:
     model = get_peft_model(model, lora_cfg)
     model.print_trainable_parameters()
 
-    # Convert training items to Hugging Face chat dataset
-    formatted_data = [{"messages": it.to_chat_dict()} for it in items]
+    # Render each example to Gemma-3 turn format with the VERIFIED formatter
+    # (folds `system` into the first user turn; emits `model` turns), NOT the
+    # tokenizer chat template — the same rendering the notebook validated.
+    formatted_data = [format_for_sft(it.to_chat_dict()) for it in items]
     hf_dataset = Dataset.from_list(formatted_data)
+    print("Sample formatted example:\n", formatted_data[0]["text"][:300], "...")
 
-    training_args = TrainingArguments(
-        output_dir=config["training"]["output_dir"],
-        num_train_epochs=config["training"]["num_train_epochs"],
-        per_device_train_batch_size=config["training"]["per_device_train_batch_size"],
-        gradient_accumulation_steps=config["training"]["gradient_accumulation_steps"],
-        gradient_checkpointing=config["training"]["gradient_checkpointing"],
-        learning_rate=float(config["training"]["learning_rate"]),
-        lr_scheduler_type=config["training"]["lr_scheduler_type"],
-        warmup_ratio=config["training"]["warmup_ratio"],
-        weight_decay=config["training"]["weight_decay"],
-        optim=config["training"]["optim"],
-        logging_steps=config["training"]["logging_steps"],
-        save_strategy=config["training"]["save_strategy"],
-        save_total_limit=config["training"]["save_total_limit"],
-        seed=config["training"]["seed"],
-        report_to=config["training"]["report_to"],
-        bf16=config["training"]["bf16"],
-        fp16=config["training"]["fp16"],
+    # Mask the prompt: compute loss ONLY on the model completion.
+    collator = build_completion_only_collator(tokenizer)
+
+    tcfg = config["training"]
+    base_cfg_kwargs = {
+        "output_dir": tcfg["output_dir"],
+        "num_train_epochs": tcfg["num_train_epochs"],
+        "per_device_train_batch_size": tcfg["per_device_train_batch_size"],
+        "gradient_accumulation_steps": tcfg["gradient_accumulation_steps"],
+        "gradient_checkpointing": tcfg["gradient_checkpointing"],
+        "learning_rate": float(tcfg["learning_rate"]),
+        "lr_scheduler_type": tcfg["lr_scheduler_type"],
+        "warmup_ratio": tcfg["warmup_ratio"],
+        "weight_decay": tcfg["weight_decay"],
+        "optim": tcfg["optim"],
+        "logging_steps": tcfg["logging_steps"],
+        "save_strategy": tcfg["save_strategy"],
+        "save_total_limit": tcfg["save_total_limit"],
+        "seed": tcfg["seed"],
+        "report_to": tcfg["report_to"],
+        "bf16": tcfg["bf16"],
+        "fp16": tcfg["fp16"],
+        "dataset_text_field": "text",
+        "packing": config["data"].get("packing", False),
+    }
+    sft_config = SFTConfig(
+        **make_sft_config_kwargs(SFTConfig, base_cfg_kwargs, config["data"]["max_seq_length"])
     )
 
     trainer = SFTTrainer(
-        model=model,
-        train_dataset=hf_dataset,
-        peft_config=lora_cfg,
-        max_seq_length=config["data"]["max_seq_length"],
-        tokenizer=tokenizer,
-        args=training_args,
+        **make_trainer_kwargs(
+            SFTTrainer,
+            model=model,
+            args=sft_config,
+            train_dataset=hf_dataset,
+            data_collator=collator,
+            tokenizer=tokenizer,
+            peft_config=lora_cfg,
+        )
     )
 
     print("\nStarting QLoRA fine-tuning...")
@@ -228,8 +255,8 @@ def main() -> int:
     parser.add_argument(
         "--config",
         "-c",
-        default="configs/training/qlora_gemma3_4b.yaml",
-        help="Path to training YAML config",
+        default="configs/training/qlora_gemma3_4b_v0.2.yaml",
+        help="Path to training YAML config (default: the exp-002 sft_v0.2 config)",
     )
     parser.add_argument(
         "--dry-run",

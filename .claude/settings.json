@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/)",
+      "Bash(rm -rf ~/*)",
+      "Bash(rm -fr ~)",
+      "Bash(rm -fr ~/)",
+      "Bash(rm -fr ~/*)",
+      "Bash(rm -Rf ~)",
+      "Bash(rm -Rf ~/)",
+      "Bash(rm -Rf ~/*)",
+      "Bash(rm -r -f ~)",
+      "Bash(rm --recursive --force ~)",
+      "Bash(rm -rf $HOME)",
+      "Bash(rm -rf $HOME/*)",
+      "Bash(rm -rf \"$HOME\")",
+      "Bash(rm -rf ${HOME})",
+      "Bash(rm -rf ${HOME}/*)",
+      "Bash(rm -rf /)",
+      "Bash(rm -fr /)",
+      "Bash(sudo rm -rf ~)",
+      "Bash(sudo rm -rf ~/)",
+      "Bash(sudo rm -rf ~/*)",
+      "Bash(sudo rm -rf /)",
+      "Bash(sudo rm -rf $HOME)"
+    ]
+  }
+}

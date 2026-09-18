@@ -1,0 +1,42 @@
+{
+  "schema": "gemma-cyber/model-registry@1",
+  "updated_at": "2026-09-10T00:00:00+00:00",
+  "models": [
+    {
+      "version": "gemma3:4b",
+      "stage": "evaluated",
+      "ollama_tag": "gemma3:4b",
+      "base_model": "gemma3:4b",
+      "dataset_version": null,
+      "git_commit": null,
+      "gguf_sha256": null,
+      "fused_model_sha256": null,
+      "experiment": null,
+      "passed_eval": false,
+      "eval_ref": "experiments/baseline_gemma3-4b_v2/scorecard.md",
+      "notes": "Frozen base/reference (the APP-GATE serve default and the anchor to beat). Ollama gemma3:4b benchmark_v2 test pass_rate 0.933; hallucination traps 0.000 (n=3). Not a specialized cyber model; not promoted to production. See docs/model-card.md.",
+      "created_at": "2026-08-26T14:11:52.267915+00:00",
+      "updated_at": "2026-09-10T00:00:00+00:00",
+      "history": []
+    },
+    {
+      "version": "gemma3-cyber:v0.2",
+      "stage": "experimental",
+      "ollama_tag": "gemma3-cyber:v0.2",
+      "base_model": "gemma3:4b",
+      "dataset_version": "sft_v0.2",
+      "git_commit": "6e5824cece894a26d2b470ace98a52641cf38cfd",
+      "gguf_sha256": null,
+      "fused_model_sha256": "1ea70da8a68526b1abbffb1eff6738319f961550348ee90ecea0bedd497ef702",
+      "experiment": "exp-002r-gemma3-cyber-v0.2",
+      "passed_eval": false,
+      "eval_ref": "experiments/exp-002r-gemma3-cyber-v0.2/RESULTS.md",
+      "notes": "exp-002r (2026-08-27) candidate of record = end-of-epoch-3 fused MLX 4-bit (SHA 1ea70da8…). MEASURED: DOES NOT PASS. v2 test overall 0.956 (bar ≥ 0.913) PASS; v2 hallucination n=3 0.333 (Δ 0 vs MLX base); v3 attack_mapping 0.000 vs base 0.250 FAIL; Kerberoasting trap still emits T1060 (correct is T1558.003 / TA0006). Stays experimental. Do not promote. Next: exp-003 / sft_v0.3.",
+      "created_at": "2026-08-26T14:11:52.268699+00:00",
+      "updated_at": "2026-09-10T00:00:00+00:00",
+      "history": [
+        {"at": "2026-08-27T00:00:00+00:00", "event": "evaluated", "passed": false, "eval_ref": "experiments/exp-002r-gemma3-cyber-v0.2/RESULTS.md", "note": "exp-002r measured fail; stays experimental"}
+      ]
+    }
+  ]
+}
